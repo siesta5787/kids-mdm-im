@@ -11,7 +11,7 @@ on:
         type: string
 
 permissions:
-  contents: read # to fetch code (actions/checkout)
+  contents: write # create/upload GitHub Releases with the default token
 
 env:
   TAG_REF: "${{ inputs.version || github.ref_name }}"
