@@ -1015,14 +1015,12 @@ object RemoteConfig {
     hotSwappable = true
   )
 
-  /** Whether the in-app GIF search is available for use.  */
+  /** Whether the in-app GIF search is available for use.
+   *  KIDS MDM IM: always disabled, independent of Signal's remote config,
+   *  so it can't be re-enabled server-side. */
   @JvmStatic
   @get:JvmName("gifSearchAvailable")
-  val gifSearchAvailable: Boolean by remoteBoolean(
-    key = "global.gifSearch",
-    defaultValue = true,
-    hotSwappable = true
-  )
+  val gifSearchAvailable: Boolean = false
 
   /** Allow media converters to remux audio instead of transcoding it.  */
   @JvmStatic

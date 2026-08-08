@@ -271,14 +271,16 @@ android {
 
   productFlavors {
     create("store") {
+      // KIDS MDM IM: default distribution flavor. Self-updates are disabled;
+      // release builds are versioned/published by our own CI instead.
       dimension = "distribution"
       buildConfigField("boolean", "MANAGE_MOLLY_UPDATES", "false")
+      isDefault = true
     }
 
     create("website") {
       dimension = "distribution"
       buildConfigField("boolean", "MANAGE_MOLLY_UPDATES", "true")
-      isDefault = true
     }
 
     create("prod") {
