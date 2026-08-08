@@ -179,3 +179,8 @@ jobs:
         run: gh release upload "$TAG_REF" ./apk/*/release/*.apk --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.PUBLISH_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Publish release
+        run: gh release edit "$TAG_REF" --draft=false
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUBLISH_PAT || secrets.GITHUB_TOKEN }}
