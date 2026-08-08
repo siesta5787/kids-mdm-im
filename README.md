@@ -1,115 +1,107 @@
-# Molly
+# Kids MDM IM
 
-[![Test](https://github.com/mollyim/mollyim-android/workflows/Test/badge.svg)](https://github.com/mollyim/mollyim-android/actions)
-[![Reproducible build](https://github.com/mollyim/mollyim-android/actions/workflows/reprocheck.yml/badge.svg)](https://github.com/mollyim/mollyim-android/actions/workflows/reprocheck.yml)
-[![Translation status](https://hosted.weblate.org/widgets/molly-instant-messenger/-/svg-badge.svg)](https://hosted.weblate.org/engage/molly-instant-messenger/?utm_source=widget)
-[![Financial contributors](https://opencollective.com/mollyim/tiers/badge.svg)](https://opencollective.com/mollyim#category-CONTRIBUTE)
-[![Cloudsmith](https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square)](https://cloudsmith.com)
+[![Test](https://github.com/siesta5787/kids-mdm-im/workflows/Test/badge.svg)](https://github.com/siesta5787/kids-mdm-im/actions)
+[![Reproducible build](https://github.com/siesta5787/kids-mdm-im/actions/workflows/reprocheck.yml/badge.svg)](https://github.com/siesta5787/kids-mdm-im/actions/workflows/reprocheck.yml)
 
-Molly is a hardened version of [Signal](https://github.com/signalapp/Signal-Android) for Android, the fast simple yet secure messaging app by [Signal Foundation](https://signal.org).
+Kids MDM IM is a hardened, parent-controlled messenger for kids, built as a
+downstream fork of [Molly](https://github.com/mollyim/mollyim-android)
+(itself a hardened fork of [Signal](https://github.com/signalapp/Signal-Android)).
+It connects to Signal's own servers, so kids can message their Signal/Molly
+contacts normally, while giving parents visibility and controls appropriate
+for a child's device.
 
-## Introduction
+It's designed to pair with a self-hosted child-MDM stack:
 
-Back in 2018, Signal allowed the user to set a passphrase to secure the local message database. But this option was removed with the introduction of file-based encryption on Android. Molly brings it back again with additional security features.
+- [kid-phone-server](https://github.com/siesta5787/kid-phone-server) — the
+  self-hosted admin server
+- [kids-launcher-mdm](https://github.com/siesta5787/kids-launcher-mdm) — the
+  device-owner launcher that enforces restrictions and syncs data to the
+  server
 
-Molly connects to Signal's servers, so you can chat with your Signal contacts seamlessly. Before signing up, please remember to review the [Signal Terms & Privacy Policy](https://signal.org/legal/).
+## About this fork
 
-We update Molly every two weeks to include the latest Signal features and fixes. The exceptions are security patches, which are applied as soon as they are available.
+This is an independent project, not affiliated with, endorsed by, or
+sponsored by Molly, Signal Messenger LLC, or the Signal Foundation. See
+[LEGAL.md](LEGAL.md) for the full disclaimer.
+
+It intentionally changes some of the privacy properties Signal/Molly
+advertise: on a device running Kids MDM IM, conversations (including
+disappearing messages and messages later deleted-for-everyone), media, and
+call history are journaled locally so the device owner (the parent) can
+review them. This is meant for a parent's own child-MDM deployment, not as
+a general-purpose Signal client — if that's not what you want, use unmodified
+[Molly](https://github.com/mollyim/mollyim-android) or
+[Signal](https://github.com/signalapp/Signal-Android) instead.
+
+We aim to track upstream Molly closely and keep our changes small and
+isolated, so it stays easy to rebase and low-maintenance to keep current with
+upstream security fixes.
+
+## Parental-control features
+
+| Feature | Status |
+| --- | --- |
+| Distinct branding/icon, no Signal/Molly trademarks | ✅ Done |
+| GIF search removed (stickers & emoji unaffected) | ✅ Done |
+| In-app self-updater removed | ✅ Done |
+| minSdk raised to Android 14, matching the launcher | ✅ Done |
+| Independent release pipeline (own version numbers, auto-published) | ✅ Done |
+| Conversation/media/call journal, synced to the launcher via local IPC | 🚧 In progress |
+| Settings gated behind a dedicated local parental PIN | 🚧 In progress |
+| Independent voice/video call blocking | 🚧 In progress |
+| Claude-reviewed auto-merge for upstream Molly syncs | 🚧 In progress |
+
+Beyond these, it inherits all of Molly's own hardening features (database
+passphrase encryption, secure RAM wiping, automatic lock, SOCKS/Tor support,
+etc.) — see [Molly's README](https://github.com/mollyim/mollyim-android#features)
+for the full list.
 
 ## Download
 
-You can download the app from GitHub's [Releases](https://github.com/mollyim/mollyim-android/releases/latest) page or install it from the [Molly F-Droid Repo](https://molly.im/fdroid/):
+Builds are published on this repo's [Releases](https://github.com/siesta5787/kids-mdm-im/releases)
+page. Release version numbers (`v0.01`, `v0.02`, ...) are our own, separate
+from Molly/Signal's version string — see [tagrelease.yml](.github/workflows/tagrelease.yml).
 
-[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
-    alt="Get it on F-Droid"
-    height="80">](https://molly.im/fdroid/)
-
-There are two versions available: **Molly** or **Molly-FOSS**. Learn the differences [below](#free-and-open-source) and download the right one for you.
-
-You can also get **Molly-FOSS** from [Accrescent](https://accrescent.app/):
-
-<a href="https://accrescent.app/app/im.molly.app">
-   <img alt="Get it on Accrescent"
-      src="https://accrescent.app/badges/get-it-on.png"
-      height="80">
-</a>
-
-To [verify](https://developer.android.com/studio/command-line/apksigner#usage-verify) the APK, use the following signing certificate fingerprints:
-```
-SHA-256: 6aa80fdf4a8cc13737cfb434fc0cde486f09cf8fcda21a67bea5ee1ca2700886
-SHA-1: 49ce310cdd0c09c8c34eb31a8005c6bf13f5a4f1
-```
-
-## Features
-
-Molly has unique features compared to Signal:
-
-- **Data encryption at rest** - Protect your app database with [passphrase encryption](https://github.com/mollyim/mollyim-android/wiki/Data-Encryption-At-Rest)
-- **Secure RAM wiper** - Securely shred sensitive data from device memory
-- **Automatic lock** - Lock the app automatically under user-defined conditions
-- **Multi-device support** - Link multiple devices to a single Signal account, including Android tablets
-- **UnifiedPush** - Receive push notifications without Google through the UnifiedPush protocol
-- **Block unknown contacts** - Block messages and calls from unknown senders for security and anti-spam
-- **Disappearing call history** - Clear call logs together with expiring messages
-- **Custom backup scheduling** - Set daily or weekly interval and the number of backups to retain
-- **SOCKS proxy and Tor support** - Tunnel app network traffic via proxy and Orbot
-- **Debug logs are optional** - Android logging can be disabled
-
-Additionally, you will find all the features of Signal, along with some minor tweaks and improvements.
+> [!NOTE]
+> Releases are currently unsigned test builds (no release signing key has
+> been configured yet). A permanent signing key will be added, and this
+> section updated with its fingerprint, before these builds are used on a
+> real device.
 
 ## Free and Open-Source
 
-Molly is open-source just like Signal. But Signal depends on proprietary Google software for some features.
-
-To support a 100% free and auditable app, Molly comes in two versions: one with proprietary blobs like Signal, and one without. They are called Molly and Molly-FOSS, respectively. You can install the flavor of your choice at any time, and it will replace any previously installed version. The data and settings will be preserved so that you do not have to re-register.
-
-### Feature Comparison
-
-Here's how some key features work in different versions of the app:
-
-| Feature                           | Molly-FOSS       | Molly                | Signal               |
-| --------------------------------- | ---------------- | -------------------- | -------------------- |
-| Push notifications <sup>(1)</sup> | ✔ WebSocket<br>✔ UnifiedPush | ⚠ FCM<br>✔ WebSocket<br>✔ UnifiedPush | ⚠ FCM<br>✔ WebSocket |
-| Location sharing                 | ✔ OpenStreetMap  | ⚠ Google Maps        | ⚠ Google Maps        |
-
-<sup>(1)</sup> You might need to turn off system-level battery restrictions for the app to receive messages when the app isn't open.
-
-### UnifiedPush
-
-[UnifiedPush](https://unifiedpush.org/) is an open standard for delivering push notifications, offering a privacy-friendly alternative to Google's proprietary FCM service. It allows users to choose their own notification distributor.
-
-> [!IMPORTANT]
-> To use UnifiedPush notifications, you need access to a [MollySocket](https://github.com/mollyim/mollysocket) server to link your Signal account to UnifiedPush. You can either run MollySocket on a server you control (strongly advised) or use a public instance.
-
-Currently, UnifiedPush is unavailable for linked devices.
+Like Molly, this fork comes in two variants: one with proprietary Google
+Play Services blobs, and one fully FOSS. Choose the FOSS variant for
+GrapheneOS or other de-Googled devices — see
+[Molly's README](https://github.com/mollyim/mollyim-android#free-and-open-source)
+for the details, which apply unchanged here.
 
 ## Compatibility with Signal
 
-Molly and Signal apps can be installed on the same device. If you need a second number for messaging, you can register Molly with a different number while keeping Signal active. Any phone number capable of receiving SMS or calls can be used during registration.
-
-If you wish to use the same phone number for both Molly and Signal, you must register Molly as a linked device. Registering the same number independently on both apps will result in only the most recently registered app staying active, while the other will go offline.
-
-For Signal users looking to switch to Molly without changing the phone number, please refer to the [Migrating From Signal](https://github.com/mollyim/mollyim-android/wiki/Migrating-From-Signal) guide on the wiki.
+This app and Signal/Molly can be installed on the same device. See
+[Molly's README](https://github.com/mollyim/mollyim-android#compatibility-with-signal)
+for how registration and linked devices work — unchanged in this fork.
 
 ## Backups
 
-Backups are fully compatible. Signal [backups](https://support.signal.org/hc/en-us/articles/360007059752-Backup-and-Restore-Messages) can be restored in Molly, and the other way around, simply by choosing the backup folder and file. However, to import a backup from Signal, you must use a matching or newer version of Molly.
+Backup format compatibility with Signal/Molly is unchanged; see
+[Molly's docs](https://github.com/mollyim/mollyim-android#backups).
 
 ## Feedback
 
-- [Submit bugs and feature requests](https://github.com/mollyim/mollyim-android/issues) on GitHub
-- Join us at [#mollyim:matrix.org](https://matrix.to/#/#mollyim:matrix.org) on Matrix (via space: [#mollyim-space:matrix.org](https://matrix.to/#/#mollyim-space:matrix.org))
-- For news, tips, and tricks, follow [@mollyim](https://fosstodon.org/@mollyim) on Mastodon
+- [Submit bugs and feature requests](https://github.com/siesta5787/kids-mdm-im/issues)
+  for this fork
+- For the launcher/server side, use the
+  [kids-launcher-mdm](https://github.com/siesta5787/kids-launcher-mdm/issues)
+  or [kid-phone-server](https://github.com/siesta5787/kid-phone-server/issues)
+  issue trackers
+- For general Molly/Signal questions unrelated to the parental-control
+  features, see [Molly's own community links](https://github.com/mollyim/mollyim-android#feedback)
 
 ## Reproducible Builds
 
-Molly supports reproducible builds, so that anyone can run the build process to reproduce the same APK as the original release.
-
-Please check the guide in the [reproducible-builds](https://github.com/mollyim/mollyim-android/blob/master/reproducible-builds) directory.
-
-## Changelog
-
-See the [Changelog](https://github.com/mollyim/mollyim-android/wiki/Changelog) to view recent changes.
+This fork keeps Molly's reproducible build setup unchanged. See the guide in
+the [reproducible-builds](reproducible-builds) directory.
 
 ## License
 
@@ -120,34 +112,7 @@ See [LEGAL.md](LEGAL.md) for legal and copyright information.
 
 ## Acknowledgements
 
-Molly is an independent project built on code published by Signal. We are
-deeply grateful to the Signal contributors for the work we build on.
-
-Thanks to the following organizations for supporting the **Molly** project.
-
-<div align="center">
-<table>
-<tr>
-  <td>
-    <a href="https://nlnet.nl/" target="_blank">
-      <img src="https://nlnet.nl/logo/banner.svg" alt="NLnet logo" height="56" />
-    </a>
-  </td>
-  <td>
-    <a href="https://bahnhof.cloud/en/" target="_blank">
-      <img src="https://upload.wikimedia.org/wikipedia/de/c/c0/Bahnhof_AB_logo.svg" alt="Bahnhof logo" height="56" />
-    </a>
-  </td>
-  <td>
-    <a href="https://cloudsmith.com/blog/cloudsmith-loves-opensource/" target="_blank">
-      <img src="https://raw.githubusercontent.com/opswithranjan/CloudsmithLogo/main/CloudsmithLogoCropped.jpeg" alt="Cloudsmith logo" height="32" />
-    </a>
-  </td>
-  <td>
-    <a href="https://www.jetbrains.com/community/opensource/" target="_blank">
-      <img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.svg" alt="JetBrains logo" height="32" />
-    </a>
-  </td>
-</tr>
-</table>
-</div>
+This fork is built entirely on the work of the [Molly](https://github.com/mollyim/mollyim-android)
+project and, through it, [Signal](https://github.com/signalapp/Signal-Android).
+We're deeply grateful to both projects' contributors — please consider
+supporting them directly if you find this fork useful.
