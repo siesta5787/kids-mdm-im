@@ -15,7 +15,6 @@ permissions:
 
 env:
   TAG_REF: "${{ inputs.version || github.ref_name }}"
-  BUILD_ENV_FILE: ${{ vars.BUILD_ENV_FILE || 'beta-stable.env' }}
   HAVE_KEYSTORE: ${{ secrets.SECRET_KEYSTORE != '' }}
 
 jobs:
@@ -38,76 +37,50 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      # KIDS MDM IM: build directly with Gradle on the runner instead of
+      # inside Molly's reproducible-builds Docker container. That Docker
+      # setup exists so third parties can verify a release APK matches
+      # this source bit-for-bit — a guarantee we don't need for a fork
+      # that isn't publicly distributed for independent verification.
+      # It also has no build/compile cache (only a read-only dependency
+      # cache), so every release rebuilt the entire codebase from a cold
+      # cache every time. Building directly here lets this cache
+      # read/write normally, same as test.yml.
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
-        with:
-          cache-read-only: true
-
-      - name: Build Docker image
-        run: docker compose build
-        working-directory: reproducible-builds
-
-      - name: Export CI environment variables
-        run: |
-          cp -v "ci/$BUILD_ENV_FILE" .env
-          for var in APP_TITLE APP_FILENAME PACKAGE_ID \
-                     BUILD_VARIANTS FORCE_INTERNAL_USER_FLAG \
-                     MAPS_API_KEY; do
-            if [ -n "${!var}" ]; then
-              echo "Setting CI_$var=${!var}"
-              echo "CI_$var=${!var}" >> $GITHUB_ENV
-            fi
-          done
-        working-directory: reproducible-builds
-        env:
-          APP_TITLE: ${{ vars.CI_APP_TITLE }}
-          APP_FILENAME: ${{ vars.CI_APP_FILENAME }}
-          PACKAGE_ID: ${{ vars.CI_PACKAGE_ID }}
-          BUILD_VARIANTS: ${{ vars.CI_BUILD_VARIANTS }}
-          FORCE_INTERNAL_USER_FLAG: ${{ vars.CI_FORCE_INTERNAL_USER_FLAG }}
 
       - name: Extract signing keys
         if: "env.HAVE_KEYSTORE == 'true'"
-        run: printenv KEYSTORE | base64 -d > certs/keystore.jks
-        working-directory: reproducible-builds
+        run: printenv KEYSTORE | base64 -d > "${{ github.workspace }}/release-keystore.jks"
         env:
           KEYSTORE: ${{ secrets.SECRET_KEYSTORE }}
 
-      - name: Build without signing
-        if: "env.HAVE_KEYSTORE == 'false'"
-        run: docker compose run -v "$GRADLE_USER_HOME/caches:/.gradle-ro-cache:ro" assemble
-        working-directory: reproducible-builds
-
-      - name: Build and sign
-        if: "env.HAVE_KEYSTORE == 'true'"
-        run: docker compose run -v "$GRADLE_USER_HOME/caches:/.gradle-ro-cache:ro" assemble
-        working-directory: reproducible-builds
+      # Only assembleRelease (APK) — bundleRelease (AAB) is a Play Store
+      # publishing format nothing in this pipeline consumes.
+      - name: Build APK
+        run: ./gradlew -PCI=true :app:assembleRelease
         env:
-          CI_KEYSTORE_PATH: certs/keystore.jks
+          CI_APP_TITLE: ${{ vars.CI_APP_TITLE }}
+          CI_APP_FILENAME: ${{ vars.CI_APP_FILENAME }}
+          CI_PACKAGE_ID: ${{ vars.CI_PACKAGE_ID }}
+          CI_BUILD_VARIANTS: ${{ vars.CI_BUILD_VARIANTS }}
+          CI_FORCE_INTERNAL_USER_FLAG: ${{ vars.CI_FORCE_INTERNAL_USER_FLAG }}
+          CI_KEYSTORE_PATH: ${{ env.HAVE_KEYSTORE == 'true' && format('{0}/release-keystore.jks', github.workspace) || '' }}
           CI_KEYSTORE_ALIAS: ${{ secrets.SECRET_KEYSTORE_ALIAS }}
           CI_KEYSTORE_PASSWORD: ${{ secrets.SECRET_KEYSTORE_PASSWORD }}
 
       - name: Clean up keystore
         if: "always()"
-        run: rm -f certs/keystore.jks
-        working-directory: reproducible-builds
+        run: rm -f "${{ github.workspace }}/release-keystore.jks"
 
-      - name: Log APK and AAB checksums
-        run: find outputs \( -name "*.aab" -o -name "*.apk" \) -exec sha256sum '{}' +
-        working-directory: reproducible-builds
+      - name: Log APK checksums
+        run: find app/build/outputs -name "*.apk" -exec sha256sum '{}' +
 
       - name: Upload APKs
         uses: actions/upload-artifact@v7
         with:
           name: apk
-          path: reproducible-builds/outputs/apk/*/release/*.apk
-          if-no-files-found: error
-
-      - name: Upload Bundles
-        uses: actions/upload-artifact@v7
-        with:
-          name: bundle
-          path: reproducible-builds/outputs/bundle/*Release/*.aab
+          path: app/build/outputs/apk/*/release/*.apk
           if-no-files-found: error
 
   prepare_release:
