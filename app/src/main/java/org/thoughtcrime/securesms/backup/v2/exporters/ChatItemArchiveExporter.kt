@@ -786,6 +786,7 @@ private fun CallTable.Call.toRemoteCallUpdate(exportState: ExportState, messageR
             CallTable.Event.ACCEPTED -> GroupCall.State.ACCEPTED
             CallTable.Event.NOT_ACCEPTED -> GroupCall.State.GENERIC
             CallTable.Event.MISSED_NOTIFICATION_PROFILE -> GroupCall.State.MISSED_NOTIFICATION_PROFILE
+            CallTable.Event.MISSED_CALL_BLOCKING -> GroupCall.State.MISSED
             CallTable.Event.GENERIC_GROUP_CALL -> GroupCall.State.GENERIC
             CallTable.Event.JOINED -> GroupCall.State.JOINED
             CallTable.Event.RINGING -> GroupCall.State.RINGING
@@ -812,6 +813,7 @@ private fun CallTable.Call.toRemoteCallUpdate(exportState: ExportState, messageR
           state = when (this.event) {
             CallTable.Event.MISSED -> IndividualCall.State.MISSED
             CallTable.Event.MISSED_NOTIFICATION_PROFILE -> IndividualCall.State.MISSED_NOTIFICATION_PROFILE
+            CallTable.Event.MISSED_CALL_BLOCKING -> IndividualCall.State.MISSED
             CallTable.Event.ACCEPTED -> IndividualCall.State.ACCEPTED
             CallTable.Event.NOT_ACCEPTED -> IndividualCall.State.NOT_ACCEPTED
             CallTable.Event.ONGOING -> IndividualCall.State.ACCEPTED
