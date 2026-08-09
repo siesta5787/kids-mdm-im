@@ -38,7 +38,13 @@ jobs:
         run: cp gradle.properties.docker "$GRADLE_USER_HOME/gradle.properties"
 
       - name: Build and run tests
-        run: ./gradlew build
+        # KIDS MDM IM: scoped to the one variant this fork actually ships
+        # (see CI_BUILD_VARIANTS=prodStoreRelease in release.yml). Plain
+        # `./gradlew build` builds+tests+lints every flavor combination
+        # upstream Molly defines (store/website x prod/staging x debug/
+        # release/instrumentation, ~7 variants) even though we only ever
+        # ship one, which was turning every push into a 1h+ CI run.
+        run: ./gradlew testProdStoreDebugUnitTest
 
       - name: Archive reports for failed build
         if: "failure()"
