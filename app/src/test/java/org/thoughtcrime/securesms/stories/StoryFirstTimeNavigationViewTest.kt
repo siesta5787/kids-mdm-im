@@ -5,7 +5,6 @@ import android.graphics.drawable.Drawable
 import android.os.Looper.getMainLooper
 import android.view.ContextThemeWrapper
 import android.view.View
-import android.widget.ImageView
 import androidx.test.core.app.ApplicationProvider.getApplicationContext
 import com.bumptech.glide.Glide
 import com.bumptech.glide.RequestBuilder
@@ -13,7 +12,6 @@ import com.bumptech.glide.RequestManager
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
-import io.mockk.verify
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -46,7 +44,7 @@ class StoryFirstTimeNavigationViewTest {
   }
 
   @Test
-  @Config(sdk = [31])
+  @Config(sdk = [34])
   fun `Given sdk 31, when I create testSubject, then I expect overlay visible and blur hash not visible`() {
     shadowOf(getMainLooper()).idle()
 
@@ -54,62 +52,17 @@ class StoryFirstTimeNavigationViewTest {
     assertFalse(testSubject.findViewById<View>(R.id.edu_blur_hash).visible)
   }
 
-  @Test
-  @Config(sdk = [30])
-  fun `Given sdk 30, when I create testSubject, then I expect overlay visible and blur hash visible`() {
-    shadowOf(getMainLooper()).idle()
-
-    assertTrue(testSubject.findViewById<View>(R.id.edu_overlay).visible)
-    assertTrue(testSubject.findViewById<View>(R.id.edu_blur_hash).visible)
-  }
+  // KIDS MDM IM: dropped the sdk=30 variants of these tests (pre-31 blur-hash-preview
+  // behavior) since minSdk is 34 here, so that code path can never run on this fork.
 
   @Test
-  @Config(sdk = [31])
+  @Config(sdk = [34])
   fun `Given sdk 31 when I set blur hash, then blur has is visible`() {
     shadowOf(getMainLooper()).idle()
 
     testSubject.setBlurHash(BlurHash.parseOrNull("0000")!!)
 
     assertFalse(testSubject.findViewById<View>(R.id.edu_blur_hash).visible)
-  }
-
-  @Test
-  @Config(sdk = [30])
-  fun `Given sdk 30, when I set blur hash, then blur hash is loaded`() {
-    shadowOf(getMainLooper()).idle()
-
-    testSubject.setBlurHash(BlurHash.parseOrNull("0000")!!)
-
-    val blurHashView = testSubject.findViewById<ImageView>(R.id.edu_blur_hash)
-    verify { requestBuilder.into(blurHashView) }
-  }
-
-  @Test
-  @Config(sdk = [30])
-  fun `Given sdk 30, when I set blur hash to null, then blur hash is hidden and cleared`() {
-    shadowOf(getMainLooper()).idle()
-
-    testSubject.setBlurHash(null)
-
-    val blurHashView = testSubject.findViewById<ImageView>(R.id.edu_blur_hash)
-    assertFalse(blurHashView.visible)
-    verify { requestManager.clear(blurHashView) }
-  }
-
-  @Test
-  @Config(sdk = [30])
-  fun `Given sdk 30 and user has seen overlay, when I set blur hash, then nothing happens`() {
-    shadowOf(getMainLooper()).idle()
-    testSubject.callback = object : StoryFirstTimeNavigationView.Callback {
-      override fun userHasSeenFirstNavigationView(): Boolean = true
-      override fun onGotItClicked() = error("Unused")
-      override fun onCloseClicked() = error("Unused")
-    }
-
-    testSubject.setBlurHash(BlurHash.parseOrNull("0000")!!)
-
-    val blurHashView = testSubject.findViewById<ImageView>(R.id.edu_blur_hash)
-    verify(exactly = 0) { requestBuilder.into(blurHashView) }
   }
 
   @Test

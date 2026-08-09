@@ -31,7 +31,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE, application = Application::class, sdk = [31])
+@Config(manifest = Config.NONE, application = Application::class, sdk = [34])
 class FullSignalAudioManagerApi31Test {
 
   companion object {

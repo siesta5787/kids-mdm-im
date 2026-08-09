@@ -26,7 +26,7 @@ import org.thoughtcrime.securesms.testutil.SystemOutLogger
 import org.thoughtcrime.securesms.webrtc.audio.AudioManagerCompat
 
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE, application = Application::class, sdk = [31])
+@Config(manifest = Config.NONE, application = Application::class, sdk = [34])
 class WebRtcAudioPicker31Test {
 
   companion object {
