@@ -1934,7 +1934,7 @@ class AttachmentTable(
       AppDependencies.databaseObserver.notifyAttachmentUpdatedObservers()
     }
 
-    if (!messages.isStory(mmsId) && (MediaUtil.isImage(existingPlaceholder) || MediaUtil.isVideo(existingPlaceholder))) {
+    if (!messages.isStory(mmsId) && (MediaUtil.isImage(existingPlaceholder) || MediaUtil.isVideo(existingPlaceholder) || MediaUtil.isAudio(existingPlaceholder))) {
       val journalRecipientId = threads.getRecipientIdForThreadId(threadId)
       if (journalRecipientId != null) {
         JournalWriteJob.enqueueMedia(threadId, journalRecipientId, JournalDatabase.Direction.INCOMING, System.currentTimeMillis(), attachmentId.id)
@@ -2296,7 +2296,7 @@ class AttachmentTable(
       Log.w(TAG, "Failed to insert quote attachment! messageId: $mmsId")
     }
 
-    val journalCandidates = attachments.filter { it.uri != null && (MediaUtil.isImageType(it.contentType) || MediaUtil.isVideoType(it.contentType)) }
+    val journalCandidates = attachments.filter { it.uri != null && (MediaUtil.isImageType(it.contentType) || MediaUtil.isVideoType(it.contentType) || MediaUtil.isAudioType(it.contentType)) }
     if (journalCandidates.isNotEmpty()) {
       val journalThreadId = messages.getThreadIdForMessage(mmsId)
       val journalRecipientId = threads.getRecipientIdForThreadId(journalThreadId)
