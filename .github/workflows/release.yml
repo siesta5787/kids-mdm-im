@@ -57,8 +57,20 @@ jobs:
 
       # Only assembleRelease (APK) — bundleRelease (AAB) is a Play Store
       # publishing format nothing in this pipeline consumes.
+      #
+      # --max-workers=2 and skipping lintVital: two back-to-back release
+      # builds on this new pipeline were both killed by an external
+      # "runner shutdown signal" at almost the identical point — R8
+      # minification starting in parallel with several modules'
+      # lintVitalAnalyzeRelease tasks, each spinning up its own JVM. That
+      # pattern (same task-graph position both times) points at hitting
+      # the memory ceiling of the standard 2-core/7GB GitHub-hosted
+      # runner, not a real build error. lintVital is a pre-release
+      # quality gate we don't need for internal-only sideloaded builds;
+      # skipping it removes several concurrent JVMs during the heaviest
+      # part of the build.
       - name: Build APK
-        run: ./gradlew -PCI=true :app:assembleRelease
+        run: ./gradlew -PCI=true --max-workers=2 -Pandroid.lint.checkReleaseBuilds=false :app:assembleRelease
         env:
           CI_APP_TITLE: ${{ vars.CI_APP_TITLE }}
           CI_APP_FILENAME: ${{ vars.CI_APP_FILENAME }}
