@@ -220,8 +220,10 @@ android {
     buildConfigField("boolean", "TRACING_ENABLED", "false")
 
     ndk {
+      // KIDS MDM IM: arm64-v8a only. Drop 32-bit ARM and x86_64
+      // (emulator/ChromeOS) support to keep the APK smaller.
       //noinspection ChromeOsAbiSupport
-      abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+      abiFilters += listOf("arm64-v8a")
     }
 
     testInstrumentationRunner = "org.thoughtcrime.securesms.testing.SignalTestRunner"
