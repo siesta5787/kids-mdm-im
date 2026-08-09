@@ -1600,10 +1600,17 @@ class CallTable(context: Context, databaseHelper: SignalDatabase) : DatabaseTabl
     /**
      * Group Calls: If you are ringing a group.
      */
-    OUTGOING_RING(9); // Next is 11
+    OUTGOING_RING(9),
+
+    /**
+     * 1:1 and Group/Ad-Hoc Calls.
+     *
+     * KIDS MDM IM: call was auto-declined by the parental call-blocking setting.
+     */
+    MISSED_CALL_BLOCKING(11); // Next is 12
 
     fun isMissedCall(): Boolean {
-      return this == MISSED || this == MISSED_NOTIFICATION_PROFILE
+      return this == MISSED || this == MISSED_NOTIFICATION_PROFILE || this == MISSED_CALL_BLOCKING
     }
 
     companion object Serializer : IntSerializer<Event> {

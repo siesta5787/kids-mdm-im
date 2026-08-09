@@ -44,6 +44,7 @@ import org.thoughtcrime.securesms.groups.GroupId;
 import org.thoughtcrime.securesms.groups.ui.invitesandrequests.joining.GroupJoinBottomSheetDialogFragment;
 import org.thoughtcrime.securesms.groups.ui.invitesandrequests.joining.GroupJoinUpdateRequiredBottomSheetDialogFragment;
 import org.thoughtcrime.securesms.groups.v2.GroupInviteLinkUrl;
+import org.thoughtcrime.securesms.keyvalue.SignalStore;
 import org.signal.core.ui.permissions.Permissions;
 import org.thoughtcrime.securesms.profiles.manage.UsernameRepository;
 import org.thoughtcrime.securesms.profiles.manage.UsernameRepository.UsernameLinkConversionResult;
@@ -398,6 +399,12 @@ public class CommunicationActions {
   }
 
   private static void startCallInternal(@NonNull CallContext callContext, @NonNull Recipient recipient, boolean isVideo, boolean fromCallLink) {
+    boolean blocked = isVideo ? SignalStore.callBlocking().getBlockVideoCalls() : SignalStore.callBlocking().getBlockVoiceCalls();
+    if (blocked) {
+      Toast.makeText(callContext.getContext(), R.string.CommunicationActions_call_blocked, Toast.LENGTH_LONG).show();
+      return;
+    }
+
     if (isVideo) startVideoCallInternal(callContext, recipient, fromCallLink);
     else         startAudioCallInternal(callContext, recipient);
   }

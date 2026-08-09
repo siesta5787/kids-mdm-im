@@ -301,6 +301,7 @@
     <string name="CommunicationActions_start_voice_call">Start voice call?</string>
     <string name="CommunicationActions_cancel">Cancel</string>
     <string name="CommunicationActions_call">Call</string>
+    <string name="CommunicationActions_call_blocked">This type of call is blocked</string>
     <string name="CommunicationActions_insecure_call">Insecure call</string>
     <string name="CommunicationActions_carrier_charges_may_apply">Carrier charges may apply. The number you are calling is not registered with Signal. This call will be placed through your mobile carrier, not over the internet.</string>
     <string name="CommunicationActions_cant_join_call">Can\'t join call</string>
@@ -3900,6 +3901,12 @@
     <string name="parental_pin_setup__continue">Continue</string>
     <string name="parental_pin_setup__pin_too_short">PIN must be at least %1$d digits</string>
     <string name="parental_pin_setup__pins_did_not_match">PINs didn\'t match. Try again.</string>
+
+    <!-- call_blocking_settings (Kids MDM IM) -->
+    <string name="call_blocking_settings__title">Call blocking</string>
+    <string name="call_blocking_settings__block_voice_calls">Block voice calls</string>
+    <string name="call_blocking_settings__block_video_calls">Block video calls</string>
+    <string name="preferences__call_blocking">Call blocking</string>
 
     <!-- prompt_mms_activity -->
     <string name="prompt_mms_activity__signal_requires_mms_settings_to_deliver_media_and_group_messages">Signal requires MMS settings to deliver media and group messages through your wireless carrier. Your device does not make this information available, which is occasionally true for locked devices and other restrictive configurations.</string>

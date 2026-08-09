@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:viewBindingIgnore="true"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/call_blocking_title"
+        style="@style/Signal.Text.Headline"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:text="@string/call_blocking_settings__title" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/call_blocking_voice_switch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:text="@string/call_blocking_settings__block_voice_calls" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/call_blocking_video_switch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/call_blocking_settings__block_video_calls" />
+
+</LinearLayout>

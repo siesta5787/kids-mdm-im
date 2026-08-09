@@ -221,6 +221,16 @@ public abstract class WebRtcActionProcessor {
       return currentState;
     }
 
+    // KIDS MDM IM: parental call-blocking setting.
+    boolean isIncomingVideoCall = offerMetadata.getOfferType() == OfferMessage.Type.VIDEO_CALL;
+    boolean callTypeBlocked     = isIncomingVideoCall ? SignalStore.callBlocking().getBlockVideoCalls() : SignalStore.callBlocking().getBlockVoiceCalls();
+    if (callTypeBlocked) {
+      Log.w(tag, "Call is blocked by parental call-blocking setting.");
+      currentState = currentState.getActionProcessor().handleSendHangup(currentState, callMetadata, WebRtcData.HangupMetadata.fromType(HangupMessage.Type.NORMAL), true);
+      webRtcInteractor.insertMissedCall(callMetadata.getRemotePeer(), receivedOfferMetadata.getServerReceivedTimestamp(), isIncomingVideoCall, CallTable.Event.MISSED_CALL_BLOCKING);
+      return currentState;
+    }
+
     return handleValidatedReceivedOffer(currentState, callMetadata, offerMetadata, receivedOfferMetadata);
   }
 

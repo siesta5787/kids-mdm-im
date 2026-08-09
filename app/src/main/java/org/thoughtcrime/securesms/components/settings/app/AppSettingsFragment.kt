@@ -337,6 +337,18 @@ private fun AppSettingsContent(
         }
 
         item {
+          val context = LocalContext.current
+
+          Rows.TextRow(
+            text = stringResource(R.string.preferences__call_blocking),
+            icon = painterResource(R.drawable.symbol_phone_fill_24),
+            onClick = {
+              context.startActivity(org.thoughtcrime.securesms.components.settings.app.calling.CallBlockingSettingsActivity.intent(context))
+            }
+          )
+        }
+
+        item {
           Rows.TextRow(
             text = stringResource(R.string.preferences_chats__chats),
             icon = painterResource(R.drawable.symbol_chat_24),

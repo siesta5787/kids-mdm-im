@@ -776,6 +776,13 @@
             android:theme="@style/Signal.DayNight"
             android:windowSoftInputMode="stateVisible" />
 
+        <!-- KIDS MDM IM -->
+        <activity
+            android:name=".components.settings.app.calling.CallBlockingSettingsActivity"
+            android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+            android:exported="false"
+            android:theme="@style/Signal.DayNight" />
+
         <activity
             android:name=".lock.v2.SvrMigrationActivity"
             android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
