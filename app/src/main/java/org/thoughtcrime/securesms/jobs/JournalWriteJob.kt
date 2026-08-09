@@ -117,7 +117,7 @@ class JournalWriteJob private constructor(
     }
   }
 
-  override fun serialize(): ByteArray {
+  override fun serialize(): ByteArray? {
     val builder = JsonJobData.Builder()
       .putLong(KEY_THREAD_ID, threadId)
       .putString(KEY_RECIPIENT_ID, recipientId)
