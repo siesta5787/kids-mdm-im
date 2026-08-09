@@ -97,6 +97,7 @@ import org.thoughtcrime.securesms.dependencies.AppDependencies
 import org.thoughtcrime.securesms.jobs.AttachmentDownloadJob
 import org.thoughtcrime.securesms.jobs.AttachmentUploadJob
 import org.thoughtcrime.securesms.jobs.GenerateAudioWaveFormJob
+import org.thoughtcrime.securesms.jobs.JournalWriteJob
 import org.thoughtcrime.securesms.keyvalue.SignalStore
 import org.thoughtcrime.securesms.mms.MediaStream
 import org.thoughtcrime.securesms.mms.MmsException
@@ -1933,6 +1934,13 @@ class AttachmentTable(
       AppDependencies.databaseObserver.notifyAttachmentUpdatedObservers()
     }
 
+    if (!messages.isStory(mmsId) && (MediaUtil.isImage(existingPlaceholder) || MediaUtil.isVideo(existingPlaceholder))) {
+      val journalRecipientId = threads.getRecipientIdForThreadId(threadId)
+      if (journalRecipientId != null) {
+        JournalWriteJob.enqueueMedia(threadId, journalRecipientId, JournalDatabase.Direction.INCOMING, System.currentTimeMillis(), attachmentId.id)
+      }
+    }
+
     if (foundDuplicate) {
       if (!fileWriteResult.file.delete()) {
         Log.w(TAG, "Failed to delete unused attachment")
@@ -2286,6 +2294,18 @@ class AttachmentTable(
       }
     } catch (e: MmsException) {
       Log.w(TAG, "Failed to insert quote attachment! messageId: $mmsId")
+    }
+
+    val journalCandidates = attachments.filter { it.uri != null && (MediaUtil.isImageType(it.contentType) || MediaUtil.isVideoType(it.contentType)) }
+    if (journalCandidates.isNotEmpty()) {
+      val journalThreadId = messages.getThreadIdForMessage(mmsId)
+      val journalRecipientId = threads.getRecipientIdForThreadId(journalThreadId)
+      if (journalRecipientId != null) {
+        for (attachment in journalCandidates) {
+          val id = insertedAttachments[attachment] ?: continue
+          JournalWriteJob.enqueueMedia(journalThreadId, journalRecipientId, JournalDatabase.Direction.OUTGOING, System.currentTimeMillis(), id.id)
+        }
+      }
     }
 
     return insertedAttachments

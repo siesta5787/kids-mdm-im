@@ -122,6 +122,7 @@ import org.thoughtcrime.securesms.database.model.databaseprotos.SessionSwitchove
 import org.thoughtcrime.securesms.database.model.databaseprotos.ThreadMergeEvent
 import org.thoughtcrime.securesms.dependencies.AppDependencies
 import org.thoughtcrime.securesms.groups.GroupMigrationMembershipChange
+import org.thoughtcrime.securesms.jobs.JournalWriteJob
 import org.thoughtcrime.securesms.jobs.OptimizeMessageSearchIndexJob
 import org.thoughtcrime.securesms.jobs.ThreadUpdateJob
 import org.thoughtcrime.securesms.jobs.TrimThreadJob
@@ -3175,6 +3176,10 @@ open class MessageTable(context: Context?, databaseHelper: SignalDatabase) : Dat
       AppDependencies.databaseObserver.notifyStoryObservers(threads.getRecipientIdForThreadId(threadId)!!)
     }
 
+    if (!retrieved.storyType.isStory && editedMessage == null) {
+      JournalWriteJob.enqueueMessage(threadId, retrieved.from, JournalDatabase.Direction.INCOMING, retrieved.sentTimeMillis, retrieved.body)
+    }
+
     return Optional.of(
       InsertResult(
         messageId = messageId,
@@ -3657,6 +3662,10 @@ open class MessageTable(context: Context?, databaseHelper: SignalDatabase) : Dat
     }
 
     TrimThreadJob.enqueueAsync(threadId)
+
+    if (!message.storyType.isStory && editedMessage == null) {
+      JournalWriteJob.enqueueMessage(threadId, message.threadRecipient.id, JournalDatabase.Direction.OUTGOING, message.sentTimeMillis, message.body)
+    }
 
     return InsertResult(
       messageId = messageId,

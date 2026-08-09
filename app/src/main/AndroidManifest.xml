@@ -22,6 +22,8 @@
     <!-- ======================================= -->
     <permission android:name="${applicationId}.ACCESS_SECRETS" android:label="Access to TextSecure Secrets" android:protectionLevel="signature" />
     <uses-permission android:name="${applicationId}.ACCESS_SECRETS" />
+    <!-- KIDS MDM IM: lets only an app signed with the same key (the companion launcher) read the parental journal. -->
+    <permission android:name="${applicationId}.ACCESS_JOURNAL" android:label="Access to Kids MDM IM parental journal" android:protectionLevel="signature" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -1569,6 +1571,14 @@
             android:authorities="${applicationId}.blob"
             android:exported="false"
             android:grantUriPermissions="true" />
+
+        <!-- KIDS MDM IM: read-only journal surface for the companion launcher app. Intentionally exported, gated by ACCESS_JOURNAL. -->
+        <provider
+            android:name=".providers.JournalProvider"
+            android:authorities="${applicationId}.journal"
+            android:exported="true"
+            android:permission="${applicationId}.ACCESS_JOURNAL"
+            android:grantUriPermissions="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

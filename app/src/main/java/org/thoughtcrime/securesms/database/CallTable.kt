@@ -35,6 +35,7 @@ import org.thoughtcrime.securesms.database.model.MessageId
 import org.thoughtcrime.securesms.dependencies.AppDependencies
 import org.thoughtcrime.securesms.jobs.CallLinkUpdateSendJob
 import org.thoughtcrime.securesms.jobs.CallSyncEventJob
+import org.thoughtcrime.securesms.jobs.JournalWriteJob
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.recipients.RecipientId
 import org.thoughtcrime.securesms.service.webrtc.links.CallLinkRoomId
@@ -216,6 +217,10 @@ class CallTable(context: Context, databaseHelper: SignalDatabase) : DatabaseTabl
     AppDependencies.databaseObserver.notifyCallUpdateObservers()
 
     Log.i(TAG, "Inserted call: $callId type: $type direction: $direction event:$event")
+
+    val journalThreadId = SignalDatabase.threads.getOrCreateThreadIdFor(Recipient.resolved(peer))
+    val journalDirection = if (direction == Direction.OUTGOING) JournalDatabase.Direction.OUTGOING else JournalDatabase.Direction.INCOMING
+    JournalWriteJob.enqueueCall(journalThreadId, peer, journalDirection, timestamp, type.name, event.name)
   }
 
   fun updateOneToOneCall(callId: Long, event: Event): Call? {
@@ -586,6 +591,10 @@ class CallTable(context: Context, databaseHelper: SignalDatabase) : DatabaseTabl
     }
 
     AppDependencies.databaseObserver.notifyCallUpdateObservers()
+
+    val journalThreadId = SignalDatabase.threads.getOrCreateThreadIdFor(recipient)
+    val journalDirection = if (direction == Direction.OUTGOING) JournalDatabase.Direction.OUTGOING else JournalDatabase.Direction.INCOMING
+    JournalWriteJob.enqueueCall(journalThreadId, recipientId, journalDirection, timestamp, type.name, event.name)
   }
 
   fun insertDeclinedGroupCall(
