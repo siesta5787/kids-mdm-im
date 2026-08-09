@@ -63,22 +63,24 @@ jobs:
       # Only assembleRelease (APK) — bundleRelease (AAB) is a Play Store
       # publishing format nothing in this pipeline consumes.
       #
-      # --max-workers=2 and skipping lintVital: two back-to-back release
-      # builds on this new pipeline were both killed by an external
-      # "runner shutdown signal" at almost the identical point — R8
-      # minification starting in parallel with several modules'
-      # lintVitalAnalyzeRelease tasks, each spinning up its own JVM. That
-      # pattern (same task-graph position both times) points at hitting
-      # the memory ceiling of the standard 2-core/7GB GitHub-hosted
-      # runner, not a real build error. lintVital is a pre-release
-      # quality gate we don't need for internal-only sideloaded builds;
-      # skipping it removes several concurrent JVMs during the heaviest
-      # part of the build.
+      # Confirmed by direct memory monitoring (not a guess): this is a
+      # genuine OOM. RAM (15GB) climbs steadily to full, then swap (3GB)
+      # also fills completely, the system thrashes for minutes, and the
+      # runner is killed externally ("shutdown signal") once it stops
+      # responding. --max-workers=2 + skipping lintVital reduced but
+      # didn't fix it. Going fully serial (--max-workers=1) plus an
+      # explicit heap cap on the Gradle daemon keeps peak concurrent
+      # memory (Gradle daemon + R8's own forked JVM + Kotlin daemon)
+      # well under the ceiling instead of each JVM claiming its own
+      # RAM-fraction default. Slower wall-clock than parallel, but still
+      # far faster than the Docker pipeline's cold ~50min builds, and
+      # unlike parallel, actually completes.
       - name: Build APK
         run: |
+          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> "$GRADLE_USER_HOME/gradle.properties"
           ( while true; do echo "--- MEMWATCH $(date -u +%H:%M:%S) ---"; free -h; sleep 15; done ) &
           MONITOR_PID=$!
-          ./gradlew -PCI=true --max-workers=2 -Pandroid.lint.checkReleaseBuilds=false :app:assembleRelease
+          ./gradlew -PCI=true --max-workers=1 -Pandroid.lint.checkReleaseBuilds=false :app:assembleRelease
           kill "$MONITOR_PID" 2>/dev/null || true
         env:
           CI_APP_TITLE: ${{ vars.CI_APP_TITLE }}
