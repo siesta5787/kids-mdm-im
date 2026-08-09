@@ -1,10 +1,12 @@
 package org.thoughtcrime.securesms.components.settings.app
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.navigation.NavDirections
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.signal.core.util.getParcelableExtraCompat
@@ -17,6 +19,8 @@ import org.thoughtcrime.securesms.components.settings.app.routes.AppSettingsRout
 import org.thoughtcrime.securesms.help.HelpFragment
 import org.thoughtcrime.securesms.keyvalue.SettingsValues
 import org.thoughtcrime.securesms.keyvalue.SignalStore
+import org.thoughtcrime.securesms.lock.v2.ParentalPinGateActivity
+import org.thoughtcrime.securesms.lock.v2.ParentalPinSetupActivity
 import org.thoughtcrime.securesms.profiles.manage.UsernameEditMode
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.service.KeyCachingService
@@ -37,8 +41,27 @@ class AppSettingsActivity : DSLSettingsActivity() {
 
   private var wasConfigurationUpdated = false
 
+  // KIDS MDM IM: gate every entry into Settings behind the local parental PIN.
+  private val parentalPinGateLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    if (result.resultCode != Activity.RESULT_OK) {
+      finish()
+    }
+  }
+
+  private val parentalPinSetupLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    if (result.resultCode != Activity.RESULT_OK) {
+      finish()
+    }
+  }
+
   override fun onCreate(savedInstanceState: Bundle?, ready: Boolean) {
     super.onCreate(savedInstanceState, ready)
+
+    if (!SignalStore.parentalPin.isEnabled) {
+      parentalPinSetupLauncher.launch(ParentalPinSetupActivity.intentForCreate(this))
+    } else {
+      parentalPinGateLauncher.launch(ParentalPinGateActivity.intent(this))
+    }
 
     val startingAction: NavDirections? = if (intent?.categories?.contains(NOTIFICATION_CATEGORY) == true) {
       AppSettingsFragmentDirections.actionDirectToNotificationsSettingsFragment()
