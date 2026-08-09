@@ -22,6 +22,11 @@ jobs:
     name: Build
     if: "github.event.base_ref != 'refs/heads/upstream-main'"
     runs-on: ubuntu-24.04
+    # KIDS MDM IM: explicit generous timeout to rule out a hidden default
+    # being the cause of three consecutive builds getting externally
+    # killed at almost the exact same ~7m30s-7m55s mark regardless of
+    # workload changes (disk space was confirmed fine: 103GB free).
+    timeout-minutes: 120
 
     steps:
       - uses: actions/checkout@v6
@@ -70,7 +75,11 @@ jobs:
       # skipping it removes several concurrent JVMs during the heaviest
       # part of the build.
       - name: Build APK
-        run: ./gradlew -PCI=true --max-workers=2 -Pandroid.lint.checkReleaseBuilds=false :app:assembleRelease
+        run: |
+          ( while true; do echo "--- MEMWATCH $(date -u +%H:%M:%S) ---"; free -h; sleep 15; done ) &
+          MONITOR_PID=$!
+          ./gradlew -PCI=true --max-workers=2 -Pandroid.lint.checkReleaseBuilds=false :app:assembleRelease
+          kill "$MONITOR_PID" 2>/dev/null || true
         env:
           CI_APP_TITLE: ${{ vars.CI_APP_TITLE }}
           CI_APP_FILENAME: ${{ vars.CI_APP_FILENAME }}
