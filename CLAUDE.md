@@ -47,13 +47,17 @@ it should stay in the hundreds of lines, not thousands.
 
 ## Signing
 
-CI signs with a **shared debug-grade keystore** (same one used by `kids-launcher-mdm`,
-required so the two apps' signature-permission-gated IPC can work) — stored as repo secrets
-`SECRET_KEYSTORE` (base64), `SECRET_KEYSTORE_ALIAS=androiddebugkey`,
-`SECRET_KEYSTORE_PASSWORD=android`. A copy of the keystore file was sent to the user
-directly (not retained by Claude) — GitHub secrets are write-only, so that file is the only
-backup. If it's ever lost, every future release needs a new key and anyone with the app
-installed must uninstall/reinstall.
+CI signs with the **shared Kids MDM release key** (same one used by `kids-launcher-mdm` and
+`kids-mdm-browser`, required so the apps' signature-permission-gated IPC can work) — stored as
+repo secrets `SECRET_KEYSTORE` (base64 PKCS12), `SECRET_KEYSTORE_ALIAS=kidsmdm`,
+`SECRET_KEYSTORE_PASSWORD` (store and key password are the same). Cert SHA-256
+`C1:01:C6:F4:4B:7E:CC:27:AF:0C:E8:B4:2A:81:64:7F:15:A6:1A:26:74:33:B8:45:9B:8B:95:4F:D4:CB:4D:AB`.
+Switched from the old shared debug keystore (`androiddebugkey`/`android`) on 2026-10-28, first
+built as v0.06 — any phone with an older build had to uninstall/reinstall (in practice, every
+enrolled phone was factory reset for the launcher's own package change at the same time). The
+keystore lives on the dev machine (`~/.android/kids-mdm-release/`) plus the user's own backup —
+GitHub secrets are write-only, so if both copies are lost, every future release needs a new key
+and every installed copy must be uninstalled/reinstalled.
 
 ## Release process
 
