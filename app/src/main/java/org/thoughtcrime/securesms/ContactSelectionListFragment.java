@@ -936,7 +936,7 @@ public final class ContactSelectionListFragment extends LoggingFragment {
     } else if (SignalStore.uiHints().getDismissedContactsPermissionBanner()) {
       builder.arbitrary(ContactSelectionListModels.ArbitraryRow.FIND_CONTACTS.getCode());
     }
-    builder.arbitrary(ContactSelectionListModels.ArbitraryRow.INVITE_TO_SIGNAL.getCode());
+    if (org.kidsmdm.im.KidsPolicy.INVITES_ENABLED) builder.arbitrary(ContactSelectionListModels.ArbitraryRow.INVITE_TO_SIGNAL.getCode()); // KIDS MDM: no invites
   }
 
   private static @Nullable ContactSearchConfiguration.TransportType resolveTransportType(boolean includePushContacts, boolean includeSmsContacts) {

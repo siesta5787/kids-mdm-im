@@ -10,6 +10,7 @@ import android.content.Context
 import android.webkit.MimeTypeMap
 import org.signal.core.models.database.AttachmentId
 import org.signal.core.models.recipients.RecipientId
+import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.database.SignalDatabase
 import org.thoughtcrime.securesms.dependencies.AppDependencies
 import org.thoughtcrime.securesms.jobmanager.Job
@@ -44,6 +45,8 @@ class JournalWriteJob private constructor(
 ) : BaseJob(parameters) {
 
   companion object {
+    private val TAG = Log.tag(JournalWriteJob::class.java)
+
     const val KEY = "JournalWriteJob"
     const val JOURNAL_MEDIA_DIR = "kids-journal-media"
 
@@ -148,7 +151,7 @@ class JournalWriteJob private constructor(
       mediaContentType = attachment.contentType
     }
 
-    JournalDatabase.getInstance(context.applicationContext as Application).entries.insert(
+    val id = JournalDatabase.getInstance(context.applicationContext as Application).entries.insert(
       JournalDatabase.JournalEntry(
         threadId = resolvedThreadId,
         recipientId = resolvedRecipientId.serialize(),
@@ -163,6 +166,7 @@ class JournalWriteJob private constructor(
         callEvent = callEvent
       )
     )
+    Log.i(TAG, "Journaled $direction $entryType as $id")
   }
 
   class Factory : Job.Factory<JournalWriteJob> {

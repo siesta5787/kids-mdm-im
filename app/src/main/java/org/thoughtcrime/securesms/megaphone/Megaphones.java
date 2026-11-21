@@ -90,6 +90,7 @@ public final class Megaphones {
 
   @WorkerThread
   static @Nullable Megaphone getNextMegaphone(@NonNull Context context, @NonNull Map<Event, MegaphoneRecord> records) {
+    if (!org.kidsmdm.im.KidsPolicy.MEGAPHONES_ENABLED) return null; // KIDS MDM: no megaphones
     long currentTime = System.currentTimeMillis();
 
     List<Megaphone> megaphones = buildDisplayOrder(context, records).entrySet().stream()

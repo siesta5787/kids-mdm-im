@@ -38,6 +38,7 @@ class DebugLogsPromptDialogFragment : FixedRoundedCornerBottomSheetDialogFragmen
 
     @JvmStatic
     fun show(activity: AppCompatActivity, purpose: Purpose) {
+      if (!org.kidsmdm.im.KidsPolicy.DEBUG_LOG_PROMPTS_ENABLED) return // KIDS MDM: no debug log prompts
       if (!activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
         return
       }

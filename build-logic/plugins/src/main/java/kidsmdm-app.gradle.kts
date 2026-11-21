@@ -11,23 +11,17 @@
 
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
-import org.w3c.dom.Element
-import org.w3c.dom.Node
-import javax.xml.parsers.DocumentBuilderFactory
-import javax.xml.transform.OutputKeys
-import javax.xml.transform.TransformerFactory
-import javax.xml.transform.dom.DOMSource
-import javax.xml.transform.stream.StreamResult
 
 object KidsMdm {
   const val FLAVOR = "kids"
   const val APPLICATION_ID = "com.kidsmdm.im"
 
-  /** Launcher label, shown under the app icon. */
+  /**
+   * Launcher label, shown under the app icon. Signal's in-app wording ("Signal") is kept on
+   * purpose; only the label changes. (A "Signal" -> "Messenger" rewrite was tried in Phase 1 and
+   * dropped: the fork is privately used, so there's no trademark reason to rebrand the text.)
+   */
   const val APP_LABEL = "Kids MDM IM"
-
-  /** Replaces "Signal" in user-visible text. */
-  const val BRAND = "Messenger"
 
   const val MIN_SDK = 34
   val ABIS = listOf("arm64-v8a")
@@ -102,28 +96,19 @@ androidComponents.finalizeDsl { android: ApplicationExtension ->
   }
 }
 
-val brandingTask = tasks.register<KidsBrandingTask>("generateKidsBrandingResources") {
-  val root = rootProject.layout.projectDirectory
-  // App first so its strings win if a library defines the same name.
-  val resDirs = listOf(root.dir("app/src/main/res")) +
-    listOf("core", "feature", "lib").flatMap { group ->
-      root.dir(group).asFile.listFiles().orEmpty().filter { it.isDirectory }.sortedBy { it.name }.map { root.dir("$group/${it.name}/src/main/res") }
-    }
-  resDirs.forEach { dir -> sourceFiles.from(fileTree(dir) { include("values*/strings.xml") }) }
-  resRoots.set(resDirs.map { it.asFile.absolutePath })
-  brand.set(KidsMdm.BRAND)
+val appLabelTask = tasks.register<KidsAppLabelTask>("generateKidsAppLabel") {
   appLabel.set(KidsMdm.APP_LABEL)
-  outputDir.set(layout.buildDirectory.dir("generated/kidsmdm/branding"))
+  outputDir.set(layout.buildDirectory.dir("generated/kidsmdm/app-label"))
 }
 
 androidComponents.onVariants(androidComponents.selector().withFlavor("distribution" to KidsMdm.FLAVOR)) { variant ->
-  // Kids identity (package + branding) on release only. kidsProdDebug is the variant Signal's
-  // unit tests run on, and those tests hard-code Signal's identity (UriUtilTest expects
-  // org.thoughtcrime.securesms URIs to count as internal; settings tests look for "Signal Secure
-  // Backups"). Keeping debug as Signal lets every test pass unmodified. Debug builds never ship.
+  // Kids identity (package + launcher label) on release only. kidsProdDebug is the variant
+  // Signal's unit tests run on, and those tests hard-code Signal's identity (UriUtilTest expects
+  // org.thoughtcrime.securesms URIs to count as internal). Keeping debug as Signal lets every test
+  // pass unmodified. Debug builds never ship.
   if (variant.buildType == "release") {
     variant.applicationId.set(KidsMdm.APPLICATION_ID)
-    variant.sources.res?.addGeneratedSourceDirectory(brandingTask, KidsBrandingTask::outputDir)
+    variant.sources.res?.addGeneratedSourceDirectory(appLabelTask, KidsAppLabelTask::outputDir)
   }
 
   // Compress native libs like Signal does for its self-distributed APKs (website/github).
@@ -135,113 +120,30 @@ androidComponents.onVariants(androidComponents.selector().withFlavor("distributi
 }
 
 /**
- * Generates resource overrides that rebrand Signal's user-visible strings, so the strings in
- * Signal's own resource files never have to be edited (which would conflict on every upstream
- * translation update). Output is one kidsmdm_branding.xml per values-qualifier directory.
+ * Generates a resource override for Signal's app_name (the launcher label). A generated directory
+ * is used rather than a file in app/src/kids/res so it applies to release variants only.
  */
 @CacheableTask
-abstract class KidsBrandingTask : DefaultTask() {
-  @get:InputFiles
-  @get:PathSensitive(PathSensitivity.RELATIVE)
-  abstract val sourceFiles: ConfigurableFileCollection
-
-  @get:Input
-  abstract val resRoots: ListProperty<String>
-
-  @get:Input
-  abstract val brand: Property<String>
-
+abstract class KidsAppLabelTask : DefaultTask() {
   @get:Input
   abstract val appLabel: Property<String>
 
   @get:OutputDirectory
   abstract val outputDir: DirectoryProperty
 
-  private companion object {
-    /** "Signal" as a word, except where it names the company/foundation or another product. */
-    val BRAND_WORD = Regex("""\bSignal\b(?!\s+(Messenger|Technology|Foundation|Protocol|Login)\b)""")
-
-    /** Strings where "Signal" means the real network/company (inviting people, donations, legal). */
-    val KEEP_ORIGINAL = Regex("(?i)invite|donat|receipt|sustainer|badge|boost|gift|license|legal|terms|privacy_policy|copyright|tax")
-
-    const val TOOLS_NS = "http://schemas.android.com/tools"
-  }
-
   @TaskAction
   fun generate() {
     val out = outputDir.get().asFile
     out.deleteRecursively()
-    out.mkdirs()
-
-    val factory = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
-    val transformer = TransformerFactory.newInstance().newTransformer().apply {
-      setOutputProperty(OutputKeys.INDENT, "yes")
-      setOutputProperty(OutputKeys.ENCODING, "utf-8")
-    }
-
-    // values-qualifier -> (resource name -> element); first module to define a name wins.
-    val byQualifier = sortedMapOf<String, LinkedHashMap<String, Element>>()
-
-    for (root in resRoots.get()) {
-      val rootDir = File(root)
-      val valueDirs = rootDir.listFiles { f -> f.isDirectory && f.name.startsWith("values") }?.sortedBy { it.name } ?: continue
-      for (dir in valueDirs) {
-        val file = File(dir, "strings.xml")
-        if (!file.exists()) continue
-        val doc = factory.newDocumentBuilder().parse(file)
-        val target = byQualifier.getOrPut(dir.name) { LinkedHashMap() }
-        val children = doc.documentElement.childNodes
-        for (i in 0 until children.length) {
-          val el = children.item(i) as? Element ?: continue
-          if (el.tagName != "string" && el.tagName != "plurals") continue
-          val name = el.getAttribute("name")
-          if (name.isEmpty() || target.containsKey(name)) continue
-
-          if (name == "app_name") {
-            target[name] = el
-            continue
-          }
-          if (KEEP_ORIGINAL.containsMatchIn(name)) continue
-          if (BRAND_WORD.containsMatchIn(el.textContent)) {
-            target[name] = el
-          }
-        }
-      }
-    }
-
-    for ((qualifier, elements) in byQualifier) {
-      if (elements.isEmpty()) continue
-      val doc = factory.newDocumentBuilder().newDocument()
-      val resources = doc.createElement("resources")
-      resources.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:tools", TOOLS_NS)
-      resources.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:xliff", "urn:oasis:names:tc:xliff:document:1.2")
-      doc.appendChild(resources)
-
-      for ((name, original) in elements) {
-        val copy = doc.importNode(original, true) as Element
-        if (name == "app_name") {
-          copy.textContent = appLabel.get()
-        } else {
-          rebrand(copy)
-        }
-        // Overriding a resource defined in another module would otherwise trip lint/aapt warnings.
-        copy.setAttributeNS(TOOLS_NS, "tools:ignore", "UnusedResources,MissingTranslation")
-        resources.appendChild(copy)
-      }
-
-      val dir = File(out, qualifier).apply { mkdirs() }
-      transformer.transform(DOMSource(doc), StreamResult(File(dir, "kidsmdm_branding.xml")))
-    }
-  }
-
-  private fun rebrand(node: Node) {
-    if (node.nodeType == Node.TEXT_NODE || node.nodeType == Node.CDATA_SECTION_NODE) {
-      node.nodeValue = BRAND_WORD.replace(node.nodeValue, brand.get())
-      return
-    }
-    // Don't touch placeholder examples inside <xliff:g>.
-    if (node is Element && node.localName == "g") return
-    val children = node.childNodes
-    for (i in 0 until children.length) rebrand(children.item(i))
+    val values = File(out, "values").apply { mkdirs() }
+    val label = appLabel.get().replace("&", "&amp;").replace("<", "&lt;").replace("'", "\\'")
+    File(values, "kidsmdm_app_label.xml").writeText(
+      """
+      |<?xml version="1.0" encoding="utf-8"?>
+      |<resources xmlns:tools="http://schemas.android.com/tools">
+      |    <string name="app_name" translatable="false" tools:ignore="UnusedResources">$label</string>
+      |</resources>
+      |""".trimMargin()
+    )
   }
 }

@@ -28,6 +28,7 @@ object InviteActions {
       context.getString(R.string.install_url)
     )
   ) {
+    if (org.kidsmdm.im.KidsPolicy.blockInvite(context)) return // KIDS MDM: no invites
     val intent = Intent().apply {
       setAction(Intent.ACTION_SEND)
       setType("text/plain")

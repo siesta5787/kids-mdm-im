@@ -62,6 +62,7 @@ class RetrieveRemoteAnnouncementsJob private constructor(private val force: Bool
     @JvmStatic
     @JvmOverloads
     fun enqueue(force: Boolean = false) {
+      if (!org.kidsmdm.im.KidsPolicy.RELEASE_NOTES_ENABLED) return // KIDS MDM: no release notes chat
       if (!SignalStore.account.isRegistered) {
         Log.i(TAG, "Not registered, skipping.")
         return

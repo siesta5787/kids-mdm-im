@@ -194,7 +194,7 @@ private fun TopAppBarActions(callbacks: NewCallUiCallbacks) {
       }
     )
 
-    DropdownMenus.Item(
+    if (org.kidsmdm.im.KidsPolicy.INVITES_ENABLED) DropdownMenus.Item( // KIDS MDM: no invites
       text = { Text(text = stringResource(R.string.text_secure_normal__invite_friends)) },
       onClick = {
         callbacks.onInviteToSignal()

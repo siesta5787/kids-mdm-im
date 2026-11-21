@@ -183,7 +183,7 @@ fun AppSettingsScreen(
           }
         }
 
-        item {
+        if (org.kidsmdm.hooks.KidsHooks.showAppSettingsRow(AppSettingsTestTags.ROW_DONATE)) item { // KIDS MDM
           Rows.TextRow(
             text = {
               Text(
@@ -343,7 +343,7 @@ fun AppSettingsScreen(
           )
         }
 
-        item {
+        if (org.kidsmdm.hooks.KidsHooks.showAppSettingsRow(AppSettingsTestTags.ROW_INVITE)) item { // KIDS MDM
           Rows.TextRow(
             text = stringResource(R.string.AppSettingsFragment__invite_your_friends),
             icon = SignalIcons.Invite.painter,

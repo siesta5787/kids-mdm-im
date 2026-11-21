@@ -8,7 +8,7 @@ Signal on 2026-11-20 because Molly had stalled at Signal 8.19.2. The Molly-era c
 Pairs with [kid-phone-server](https://github.com/siesta5787/kid-phone-server) and
 [kids-launcher-mdm](https://github.com/siesta5787/kids-launcher-mdm).
 
-- **Package**: `com.kidsmdm.im` · **Launcher label**: "Kids MDM IM" · **In-app brand**: "Messenger"
+- **Package**: `com.kidsmdm.im` · **Launcher label**: "Kids MDM IM" · **In-app wording**: Signal's own (no rebrand)
 - **Shipped variant**: `kidsProdRelease`, built by `./gradlew :Signal-Android:assembleKidsProdRelease`
   (Signal renames the `:app` project to `:Signal-Android`)
 
@@ -21,7 +21,7 @@ fast-forward `main`). That only works while our changes rarely conflict. In orde
    resources override Signal's, and its manifest is merged on top of Signal's).
 2. **Build-time mechanisms**: `build-logic/plugins/src/main/java/kidsmdm-app.gradle.kts` holds
    *all* build customizations (flavor, applicationId, signing, minSdk, ABI, versionCode,
-   generated branding). It changes Signal's DSL in `finalizeDsl`, after Signal's own `android {}`
+   generated launcher label). It changes Signal's DSL in `finalizeDsl`, after Signal's own `android {}`
    block has run.
 3. **One-line hooks** in Signal files, only at real choke points, each marked `// KIDS MDM:`.
 
@@ -42,7 +42,15 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
 | `jobs/JobManagerFactories.java` | one line: register `JournalWriteJob` |
 | `util/CommunicationActions.java` | one line: block outgoing calls (`KidsCallBlocking`) |
 | `service/webrtc/WebRtcActionProcessor.java` | three lines: hang up blocked incoming calls |
-| `conversation/AttachmentKeyboardButtonAdapter.java` | one line: hide the Location button (`KidsPolicy`) |
+| `conversation/AttachmentKeyboardButtonAdapter.java` | one line: hide the Location and Payment buttons (`KidsPolicy`) |
+| `feature/app-settings/.../home/AppSettingsScreen.kt` (again) | the Donate and Invite rows each wrapped in `if (KidsHooks.showAppSettingsRow(...))` |
+| `megaphone/Megaphones.java` | one line: no megaphones at all (`KidsPolicy.MEGAPHONES_ENABLED`) |
+| `components/DebugLogsPromptDialogFragment.kt` | one line: no "submit a debug log?" prompts |
+| `jobs/RetrieveRemoteAnnouncementsJob.kt` | one line: no release-note/announcement fetch |
+| `org/signal/core/util/invite/InviteActions.kt` (app module) | one line: every invite button shows "Invites are turned off" instead (`KidsPolicy.blockInvite`) |
+| `ContactSelectionListFragment.java` | one line: no "Invite to Signal" row in contact pickers |
+| `conversation/NewConversationActivity.kt`, `calls/new/NewCallActivity.kt` | one line each: no "Invite friends" menu item |
+| `conversation/v2/DisabledInputView.kt` | one line: no invite button on non-Signal contacts |
 | `.github/workflows/*` (Signal's) | deleted: they'd retarget our PRs to release branches, run a stale bot, etc. The sync job auto-resolves Signal edits to them by keeping the deletion. |
 
 ## Where our code lives
@@ -60,7 +68,13 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
     (`kids-journal.db`), `JournalProvider`. The schema, authority (`<appId>.journal`), URIs
     (`entries/<sinceId>`, `media/<file>`), 200-row pages and the `ACCESS_JOURNAL` signature
     permission are a **contract with kids-launcher-mdm's JournalSync**: change both sides together.
-  - `KidsCallBlocking`, `KidsPolicy` (disabled attachment types), `KidsForcedConfig` (remote config).
+    Each journal has a base (its creation time in ms, in `journal_meta`): entry ids start above
+    it and `thread_id` is base + Signal's thread id (DB version 2 shifted older rows). After a
+    reinstall, ids stay above the launcher's saved cursor, and new threads don't merge with old
+    ones on the server, which groups conversations by `thread_id`.
+  - `KidsCallBlocking`, `KidsPolicy` (feature switches: location, invites, megaphones, prompts,
+    hidden settings rows, attachment buttons), `KidsForcedConfig` (forced remote config: GIF search,
+    payments kill switch, call-quality survey, backup megaphones, Jetpack Telecom off).
 - `kidsmdm/hooks` (`:kidsmdm-hooks`): hook points for Signal's *library* modules, which can't see
   app code. `kidsmdm/settings.gradle.kts` adds the dependency to those modules, so their build files
   stay untouched.
@@ -77,7 +91,7 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
   the `vX.YY` tag (`-PkidsVersion`), always above the last Molly-based build (171915). It's also
   exposed as `BuildConfig.KIDS_VERSION`.
 - **Debug is the test variant and keeps Signal's identity; release is Kids MDM IM.** The package
-  (`com.kidsmdm.im`), minSdk 34 and the "Messenger" branding are applied to **release variants only**.
+  (`com.kidsmdm.im`), minSdk 34 and the "Kids MDM IM" launcher label are applied to **release variants only**.
   `kidsProdDebug` is where Signal's ~5,400 unit tests run, and they hard-code Signal's identity:
   Robolectric pinned to SDK 28, `UriUtilTest` expecting `org.thoughtcrime.securesms` URIs, and
   settings tests looking for "Signal Secure Backups". Keeping debug as Signal means no Signal test is
@@ -86,11 +100,12 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
   on a release build.
 - **One arm64 APK**, no ABI splits. kid-phone-server installs the first `.apk` asset of the latest
   GitHub release and rejects non-arm64 APKs and lower version codes.
-- **Branding**: the `generateKidsBrandingResources` task rewrites "Signal" to "Messenger" in every
-  string of app/core/feature/lib modules and every locale, and sets `app_name` to "Kids MDM IM". It
-  writes a generated res dir for kids release variants (see above). It deliberately keeps "Signal" in
-  invite/donation/legal strings and in "Signal Login/Messenger/Technology Foundation/Protocol".
-  Non-Latin transliterations of "Signal" in some locales aren't caught.
+- **Label only, no rebrand**: the `generateKidsAppLabel` task sets `app_name` to "Kids MDM IM" for
+  kids release variants. Every in-app string keeps Signal's own wording (a "Signal"→"Messenger"
+  rewrite was dropped on 2026-11-21 over licensing concerns).
+- **Calls stay off Android's Telecom framework** (`android.calling.useJetPackTelecom.2` forced off).
+  On v0.07, where Signal had Telecom on, every call ended straight away as missed in both directions
+  on the test phone. Molly 8.19 never used Telecom below Android 16.
 - **Dependency verification is strict** (`gradle/verification-metadata.xml`). Adding an external
   dependency means writing checksums. Prefer code that needs none.
 
@@ -111,7 +126,7 @@ for review if its package, signing key or permissions change, or its versionCode
 
 | Workflow | What |
 |---|---|
-| `kids-test.yml` | PRs + pushes to `main`/`next`: `kidsmdm/scripts/check-no-google.sh` (fails if any Google artifact would ship) + `assembleKidsProdDebug` + `testKidsProdDebugUnitTest` + `processKidsProdReleaseResources` (checks the release-only branding overlay merges) |
+| `kids-test.yml` | PRs + pushes to `main`/`next`: `kidsmdm/scripts/check-no-google.sh` (fails if any Google artifact would ship) + `assembleKidsProdDebug` + `testKidsProdDebugUnitTest` + `processKidsProdReleaseResources` (checks the release-only label overlay merges) |
 | `kids-test-apk.yml` | pushes to `next`: signed release APK as a workflow **artifact** (not a release) for side-loading. versionCode 200000. |
 | `kids-build-apk.yml` | reusable: builds one signed `kidsProdRelease` APK |
 | `kids-tagrelease.yml` | `gh workflow run kids-tagrelease.yml -R siesta5787/kids-mdm-im [-f version=X.YY]`: tags `main` (default: next version after the highest `vX.YY`), then calls release |
@@ -137,15 +152,17 @@ fetched (`GIT_LFS_SKIP_SMUDGE=1`); they aren't needed to build.
 
 ## Rebase status (see the plan in the Kids MDM memory / chat of 2026-11-20)
 
-- [x] Phase 1: skeleton (flavor, package, signing, branding, CI)
+- [x] Phase 1: skeleton (flavor, package, signing, launcher label, CI)
 - [x] Phase 2: FOSS. Swap every Google library (firebase-messaging, play-services-*, play core,
       billing, wallet, credentials compat, googleid) for do-nothing stub modules via Gradle dependency
       substitution. **No Google push at all** (decided 2026-11-20): delivery is UnifiedPush (Phase 6)
       or Signal's own websocket fallback, so no Firebase project is needed.
 - [x] Phase 3: port journal, call blocking, GIF-off; app-wide parental PIN gate; location
       sharing disabled (pulled forward from Phase 4 after it crashed in testing)
-- [ ] Phase 4: hide payments/donations/megaphones/prompts (forced remote config + few hooks);
-      disable location sharing
+- [x] Phase 4: hide payments/donations/invites/megaphones/prompts/release notes (forced remote
+      config + one-line hooks). Kept on purpose: the battery-optimization prompt (the websocket
+      needs it) and the functional chat-list banners. Remaining invite buttons hit the
+      `InviteActions` hook; Signal's invite screen is PIN-gated.
 - [ ] Phase 5: block unknown contacts
 - [ ] Phase 6: UnifiedPush (Molly's `im.molly.unifiedpush`, launcher distributor + MollySocket).
       Add a first-run choice between **WebSocket** and **UnifiedPush**, and never mention Google Play

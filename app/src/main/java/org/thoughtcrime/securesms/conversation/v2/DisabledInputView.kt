@@ -219,7 +219,7 @@ class DisabledInputView @JvmOverloads constructor(
         findViewById<MaterialButton>(R.id.export_sms_button).apply {
           setText(R.string.ConversationActivity__invite_to_signal)
           setOnClickListener { listener?.onInviteToSignal(recipient) }
-          visible = !recipient.isMmsGroup
+          visible = !recipient.isMmsGroup && org.kidsmdm.im.KidsPolicy.INVITES_ENABLED // KIDS MDM: no invites
         }
       }
     )

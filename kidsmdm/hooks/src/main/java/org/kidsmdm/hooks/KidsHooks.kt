@@ -20,6 +20,14 @@ object KidsHooks {
     appSettingsContent?.invoke(scope)
   }
 
+  /** Signal settings rows to hide, by their AppSettingsTestTags tag (e.g. "row-donate"). */
+  @Volatile
+  var hiddenAppSettingsRows: Set<String> = emptySet()
+
+  /** Hook: guards individual rows in AppSettingsScreen. */
+  @JvmStatic
+  fun showAppSettingsRow(testTag: String): Boolean = testTag !in hiddenAppSettingsRows
+
   /**
    * Remote-config values forced on, keyed like Signal's service keys ("global.gifSearch"), as the
    * raw strings the service would send. They win over whatever Signal's server sends.

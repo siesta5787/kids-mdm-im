@@ -49,8 +49,28 @@ class JournalDatabase private constructor(
   companion object {
     private val TAG = Log.tag(JournalDatabase::class.java)
 
-    private const val DATABASE_VERSION = 1
+    private const val DATABASE_VERSION = 2
     private const val DATABASE_NAME = "kids-journal.db"
+
+    /** Lowest possible id base (2023-11-14), in case the clock is unset when the journal is created. */
+    private const val MIN_ID_BASE = 1_700_000_000_000L
+
+    /**
+     * Each journal gets a base, the time in milliseconds when it was created, stored in
+     * [META_TABLE]. Entry ids start above it, and the `thread_id` the launcher sees is base +
+     * Signal's thread id. After a reinstall (or a journal that had to be recreated), Signal's ids
+     * restart at 1, but the journal's keep counting up past everything already on the server:
+     *  - the launcher only asks for `_id > ` its last synced id, so ids restarting at 1 would hide
+     *    every new entry from it;
+     *  - kid-phone-server groups conversations by thread id, so a restarted thread 1 would merge
+     *    with a different contact's old thread 1.
+     * An install would need more than one entry per millisecond over its whole life to overlap
+     * the next one's base.
+     */
+    private fun newIdBase(): Long = maxOf(System.currentTimeMillis(), MIN_ID_BASE)
+
+    private const val META_TABLE = "journal_meta"
+    private const val META_ID_BASE = "id_base"
 
     @Volatile
     private var instance: JournalDatabase? = null
@@ -75,10 +95,36 @@ class JournalDatabase private constructor(
     Log.i(TAG, "onCreate()")
     db.execSQL(JournalEntryTable.CREATE_TABLE)
     JournalEntryTable.CREATE_INDEXES.forEach { db.execSQL(it) }
+    setIdBase(db, newIdBase())
   }
 
   override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
     Log.i(TAG, "onUpgrade($oldVersion, $newVersion)")
+    if (oldVersion < 2) {
+      // Version 1 used Signal's ids as they are. Move the existing rows above a new base, so a
+      // launcher still holding a cursor from an earlier install picks them up too.
+      val base = newIdBase()
+      db.execSQL(
+        "UPDATE ${JournalEntryTable.TABLE_NAME} SET " +
+          "${JournalEntryTable.ID} = ${JournalEntryTable.ID} + $base, " +
+          "${JournalEntryTable.THREAD_ID} = ${JournalEntryTable.THREAD_ID} + $base"
+      )
+      setIdBase(db, base)
+    }
+  }
+
+  private fun setIdBase(db: SQLiteDatabase, base: Long) {
+    db.execSQL("CREATE TABLE IF NOT EXISTS $META_TABLE (key TEXT PRIMARY KEY, value INTEGER NOT NULL)")
+    db.execSQL("INSERT OR REPLACE INTO $META_TABLE (key, value) VALUES ('$META_ID_BASE', $base)")
+    // The next entry gets an id above the base (AUTOINCREMENT never goes below the highest
+    // existing id either, so shifted rows are safe).
+    db.execSQL("DELETE FROM sqlite_sequence WHERE name = '${JournalEntryTable.TABLE_NAME}'")
+    db.execSQL("INSERT INTO sqlite_sequence (name, seq) VALUES ('${JournalEntryTable.TABLE_NAME}', $base)")
+  }
+
+  /** This journal's base, see [newIdBase]. */
+  val idBase: Long by lazy {
+    readableDatabase.compileStatement("SELECT value FROM $META_TABLE WHERE key = '$META_ID_BASE'").use { it.simpleQueryForLong() }
   }
 
   override fun onOpen(db: SQLiteDatabase) {
@@ -93,6 +139,7 @@ class JournalDatabase private constructor(
   enum class EntryType { MESSAGE, MEDIA, CALL }
 
   data class JournalEntry(
+    /** Signal's thread id; stored offset by [idBase]. */
     val threadId: Long,
     val recipientId: String,
     val displayName: String?,
@@ -156,7 +203,7 @@ class JournalDatabase private constructor(
       return writableDatabase
         .insertInto(TABLE_NAME)
         .values(
-          THREAD_ID to entry.threadId,
+          THREAD_ID to openHelper.idBase + entry.threadId,
           RECIPIENT_ID to entry.recipientId,
           DISPLAY_NAME to entry.displayName,
           DIRECTION to entry.direction.name,

@@ -24,6 +24,7 @@ object KidsMdm {
     KidsSettings.init(application)
     KidsPinGate.install(application)
     KidsHooks.forcedRemoteConfig = KidsForcedConfig.VALUES
+    KidsHooks.hiddenAppSettingsRows = KidsPolicy.HIDDEN_APP_SETTINGS_ROWS
 
     KidsHooks.appSettingsContent = {
       item {
