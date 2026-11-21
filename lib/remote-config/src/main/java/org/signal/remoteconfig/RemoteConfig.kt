@@ -360,6 +360,7 @@ object RemoteConfig {
 
   /** The raw value a config reads from, preferring an internal override over what the service sent us. */
   private fun effectiveRawValue(key: String): Any? {
+    org.kidsmdm.hooks.KidsHooks.remoteConfigOverride(key)?.let { return it } // KIDS MDM: forced config
     val overrides = overrideValues
     return if (overrides.isEmpty()) REMOTE_VALUES[key] else overrides[key] ?: REMOTE_VALUES[key]
   }

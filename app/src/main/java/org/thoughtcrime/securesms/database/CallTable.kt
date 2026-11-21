@@ -216,6 +216,7 @@ class CallTable(context: Context, databaseHelper: SignalDatabase) : DatabaseTabl
     AppDependencies.databaseObserver.notifyCallUpdateObservers()
 
     Log.i(TAG, "Inserted call: $callId type: $type direction: $direction event:$event")
+    org.kidsmdm.im.journal.KidsJournal.onCallInserted(peer, direction == Direction.OUTGOING, timestamp, type.name, event.name) // KIDS MDM: journal
   }
 
   fun updateOneToOneCall(callId: Long, event: Event): OneToOneCallUpdate {
@@ -613,6 +614,7 @@ class CallTable(context: Context, databaseHelper: SignalDatabase) : DatabaseTabl
     }
 
     AppDependencies.databaseObserver.notifyCallUpdateObservers()
+    org.kidsmdm.im.journal.KidsJournal.onCallInserted(recipientId, direction == Direction.OUTGOING, timestamp, type.name, event.name) // KIDS MDM: journal
   }
 
   fun insertDeclinedGroupCall(

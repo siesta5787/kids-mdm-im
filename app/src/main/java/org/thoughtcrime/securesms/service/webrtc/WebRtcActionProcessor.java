@@ -176,6 +176,10 @@ public abstract class WebRtcActionProcessor {
   {
     Log.i(tag, "handleReceivedOffer(): id: " + callMetadata.getCallId().format(callMetadata.getRemoteDevice()) + " offer_type:" + offerMetadata.getOfferType());
 
+    if (org.kidsmdm.im.KidsCallBlocking.blockIncomingCall(callMetadata.getRemotePeer().getId(), receivedOfferMetadata.getServerReceivedTimestamp(), offerMetadata.getOfferType() == OfferMessage.Type.VIDEO_CALL)) { // KIDS MDM: call blocking
+      return currentState.getActionProcessor().handleSendHangup(currentState, callMetadata, WebRtcData.HangupMetadata.fromType(HangupMessage.Type.NORMAL), true);
+    }
+
     if (receivedOfferMetadata.getDestinationServiceId() instanceof ServiceId.PNI) {
       if (RecipientUtil.isCallRequestAccepted(callMetadata.getRemotePeer().getRecipient())) {
         Log.i(tag, "Caller is trusted but called our PNI, insert missed call and send hangup as we can't proceed.");

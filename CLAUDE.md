@@ -34,7 +34,37 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
 |---|---|
 | `app/build.gradle.kts` | one line: `id("kidsmdm-app")` |
 | `settings.gradle.kts` | one line at the end: `apply(from = "kidsmdm/settings.gradle.kts")`, which swaps every Google library for a stub in `kidsmdm/stubs/` (see its README) |
+| `feature/app-settings/.../home/AppSettingsScreen.kt` | one line: `KidsHooks.appSettingsItems(this)` (adds the "Parental controls" row) |
+| `lib/remote-config/.../RemoteConfig.kt` | one line in `effectiveRawValue`: forced values from `KidsForcedConfig` |
+| `database/MessageTable.kt` | two lines: journal incoming/outgoing inserts (`KidsJournal`) |
+| `database/AttachmentTable.kt` | one line: journal downloaded incoming media |
+| `database/CallTable.kt` | two lines: journal 1:1 and joined/rung group calls |
+| `jobs/JobManagerFactories.java` | one line: register `JournalWriteJob` |
+| `util/CommunicationActions.java` | one line: block outgoing calls (`KidsCallBlocking`) |
+| `service/webrtc/WebRtcActionProcessor.java` | three lines: hang up blocked incoming calls |
+| `conversation/AttachmentKeyboardButtonAdapter.java` | one line: hide the Location button (`KidsPolicy`) |
 | `.github/workflows/*` (Signal's) | deleted: they'd retarget our PRs to release branches, run a stale bot, etc. The sync job auto-resolves Signal edits to them by keeping the deletion. |
+
+## Where our code lives
+
+- `app/src/kids/java/org/kidsmdm/im/`: all app-side Kids MDM code, compiled only into `kids` variants.
+  Signal's code reaches it only through the one-line hooks above (fully qualified, `// KIDS MDM:` comment).
+  - `KidsMdm` + `KidsInitProvider`: startup, run from a manifest provider before Signal's
+    `Application.onCreate`. No change to Signal's Application class.
+  - `KidsSettings`: parental settings in their own SharedPreferences (`kidsmdm_settings`), not
+    SignalStore. Read only through this object, so they can later be pushed from the server.
+  - `pin/`: `KidsPinGate` locks settings-type screens **by package** with an activity-lifecycle
+    callback. It needs no hook, and screens Signal adds in those packages are locked automatically.
+    PIN prompt/setup screens. Re-locks 15 s after leaving locked screens, or when backgrounded.
+  - `journal/`: `KidsJournal` (hook entry points), `JournalWriteJob`, `JournalDatabase`
+    (`kids-journal.db`), `JournalProvider`. The schema, authority (`<appId>.journal`), URIs
+    (`entries/<sinceId>`, `media/<file>`), 200-row pages and the `ACCESS_JOURNAL` signature
+    permission are a **contract with kids-launcher-mdm's JournalSync**: change both sides together.
+  - `KidsCallBlocking`, `KidsPolicy` (disabled attachment types), `KidsForcedConfig` (remote config).
+- `kidsmdm/hooks` (`:kidsmdm-hooks`): hook points for Signal's *library* modules, which can't see
+  app code. `kidsmdm/settings.gradle.kts` adds the dependency to those modules, so their build files
+  stay untouched.
+- `kidsmdm/stubs`: FOSS stand-ins for Google libraries (see its README).
 
 ## Build details
 
@@ -85,13 +115,15 @@ for review if its package, signing key or permissions change, or its versionCode
 | `kids-test-apk.yml` | pushes to `next`: signed release APK as a workflow **artifact** (not a release) for side-loading. versionCode 200000. |
 | `kids-build-apk.yml` | reusable: builds one signed `kidsProdRelease` APK |
 | `kids-tagrelease.yml` | `gh workflow run kids-tagrelease.yml -R siesta5787/kids-mdm-im [-f version=X.YY]`: tags `main` (default: next version after the highest `vX.YY`), then calls release |
-| `kids-release.yml` | builds the tag, checks its versionCode beats every other release, publishes `KidsMDMIM-vX.YY.apk` as a **beta prerelease** |
+| `kids-release.yml` | runs on a pushed `vX.YY` tag (from any branch: `git tag v0.07 <commit> && git push origin v0.07`) or when called; builds the tag, checks its versionCode beats every other release, publishes `KidsMDMIM-vX.YY.apk` as a **beta prerelease** |
 | `kids-promote.yml` | `gh workflow run kids-promote.yml -R siesta5787/kids-mdm-im -f version=X.YY`: beta → stable |
 | `kids-sync.yml` | twice daily: Signal stable (from `updates.signal.org/android/latest.json`) → `sync/signal-vX` → test → fast-forward `main` → automatic beta release; opens an issue on conflict or failure; mirrors the release to `signal-stable` |
 
 `workflow_dispatch` and `schedule` only work for workflows on the default branch. Until cutover
-makes this branch `main`, tag, release, promote and sync can't run. Only `kids-test` and
-`kids-test-apk` can.
+makes this branch `main`, tagrelease, promote and sync can't be started. A beta can still be
+published by pushing a `vX.YY` tag on `next` by hand, which triggers `kids-release`.
+**Before cutover, the kids' "Kids MDM IM" server entry must keep "Include prereleases" off**, or a
+beta would replace the Molly-based app on their phones.
 
 Secrets: `SECRET_KEYSTORE` (base64 PKCS12), `SECRET_KEYSTORE_ALIAS=kidsmdm`,
 `SECRET_KEYSTORE_PASSWORD` (shared Kids MDM release key, cert SHA-256
@@ -110,9 +142,13 @@ fetched (`GIT_LFS_SKIP_SMUDGE=1`); they aren't needed to build.
       billing, wallet, credentials compat, googleid) for do-nothing stub modules via Gradle dependency
       substitution. **No Google push at all** (decided 2026-11-20): delivery is UnifiedPush (Phase 6)
       or Signal's own websocket fallback, so no Firebase project is needed.
-- [ ] Phase 3: port journal, call blocking, GIF-off; app-wide parental PIN gate
+- [x] Phase 3: port journal, call blocking, GIF-off; app-wide parental PIN gate; location
+      sharing disabled (pulled forward from Phase 4 after it crashed in testing)
 - [ ] Phase 4: hide payments/donations/megaphones/prompts (forced remote config + few hooks);
       disable location sharing
 - [ ] Phase 5: block unknown contacts
-- [ ] Phase 6: UnifiedPush (Molly's `im.molly.unifiedpush`, launcher distributor + MollySocket)
+- [ ] Phase 6: UnifiedPush (Molly's `im.molly.unifiedpush`, launcher distributor + MollySocket).
+      Add a first-run choice between **WebSocket** and **UnifiedPush**, and never mention Google Play
+      (the user's request after testing: today the app "fails over" to websocket with Play wording,
+      which is confusing when Play will never be used).
 - [ ] Phase 7: cutover (uninstall/reinstall phones: Molly's on-device data isn't readable)

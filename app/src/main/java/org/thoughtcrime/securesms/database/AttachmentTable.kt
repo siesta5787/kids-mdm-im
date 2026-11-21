@@ -2211,6 +2211,8 @@ class AttachmentTable(
 
     val threadId = messages.getThreadIdForMessage(mmsId)
 
+    org.kidsmdm.im.journal.KidsJournal.onAttachmentDownloaded(threadId, attachmentId, existingPlaceholder.contentType, messages.isStory(mmsId), archiveRestore || offloadRestoredAt != null) // KIDS MDM: journal
+
     if (!messages.isStory(mmsId)) {
       threads.updateSnippetUriSilently(threadId, snippetMessageId = mmsId, attachment = PartAuthority.getAttachmentDataUri(attachmentId))
     }

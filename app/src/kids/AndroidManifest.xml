@@ -11,7 +11,57 @@
          that name, so under our package we have to request our own one. -->
     <uses-permission android:name="${applicationId}.ACCESS_SECRETS" />
 
+    <!-- Location sharing is disabled (org.kidsmdm.im.KidsPolicy). Device transfer doesn't need
+         location on Android 13+ (it uses NEARBY_WIFI_DEVICES, neverForLocation), and release
+         builds are minSdk 34. tools:node="remove" also drops lib/device-transfer's copies. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" tools:node="remove" />
+
+    <!-- Lets only an app signed with the same key (kids-launcher-mdm) read the parental journal. -->
+    <permission
+        android:name="${applicationId}.ACCESS_JOURNAL"
+        android:label="Access to Kids MDM IM parental journal"
+        android:protectionLevel="signature" />
+
     <application>
+        <!-- Runs org.kidsmdm.im.KidsMdm.init at process start (PIN gate, settings row). -->
+        <provider
+            android:name="org.kidsmdm.im.KidsInitProvider"
+            android:authorities="${applicationId}.kidsmdm-init"
+            android:exported="false"
+            android:initOrder="1000" />
+
+        <!-- Read-only journal surface for the launcher. Exported on purpose, gated by ACCESS_JOURNAL.
+             The authority and URIs are a contract with kids-launcher-mdm's JournalSync. -->
+        <provider
+            android:name="org.kidsmdm.im.journal.JournalProvider"
+            android:authorities="${applicationId}.journal"
+            android:exported="true"
+            android:grantUriPermissions="false"
+            android:permission="${applicationId}.ACCESS_JOURNAL" />
+
+        <activity
+            android:name="org.kidsmdm.im.pin.ParentalPinGateActivity"
+            android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Signal.DayNight"
+            android:windowSoftInputMode="stateVisible" />
+
+        <activity
+            android:name="org.kidsmdm.im.pin.ParentalPinSetupActivity"
+            android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Signal.DayNight"
+            android:windowSoftInputMode="stateVisible" />
+
+        <activity
+            android:name="org.kidsmdm.im.settings.KidsSettingsActivity"
+            android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+            android:exported="false"
+            android:theme="@style/Signal.DayNight" />
+
         <!-- No Google libraries ship (kidsmdm/settings.gradle.kts), so drop Signal's Google meta-data:
              the Maps API key, the Google Pay flag and the Play services version. -->
         <meta-data android:name="com.google.android.gms.wallet.api.enabled" tools:node="remove" />

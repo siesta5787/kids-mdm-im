@@ -32,6 +32,12 @@ kidsStubs.forEach { name ->
 }
 project(":kidsmdm-stubs").projectDir = settings.rootDir.resolve("kidsmdm/stubs")
 
+// Hook points that Signal's modules call (kidsmdm/hooks). The dependency is added here, so
+// Signal's own build files stay untouched.
+include(":kidsmdm-hooks")
+project(":kidsmdm-hooks").projectDir = settings.rootDir.resolve("kidsmdm/hooks")
+registerKidsHooksDependency(gradle, setOf(":Signal-Android", ":feature:app-settings", ":lib:remote-config"))
+
 /** Google artifact (group:name, any version) to the stub project that replaces it. */
 val kidsSubstitutions = mapOf(
   "com.google.android.gms:play-services-tasks" to "gms-tasks",
@@ -56,7 +62,7 @@ registerKidsSubstitutions(gradle, kidsSubstitutions.toMap())
 // (the configuration cache can't serialize script object references).
 fun registerKidsSubstitutions(gradle: Gradle, substitutions: Map<String, String>) {
   gradle.lifecycle.beforeProject {
-    if (path.startsWith(":kidsmdm-stubs")) return@beforeProject
+    if (path.startsWith(":kidsmdm-")) return@beforeProject
 
     configurations.configureEach {
       resolutionStrategy.dependencySubstitution {
@@ -65,6 +71,19 @@ fun registerKidsSubstitutions(gradle: Gradle, substitutions: Map<String, String>
         }
         // Google Play Billing; the stub BillingFactory returns Signal's own Empty implementations.
         substitute(project(":lib:billing")).using(project(":kidsmdm-stubs:billing")).because("Kids MDM IM ships no Google libraries")
+      }
+    }
+  }
+}
+
+/** Adds `implementation(project(":kidsmdm-hooks"))` to the given Signal projects. */
+fun registerKidsHooksDependency(gradle: Gradle, projectPaths: Set<String>) {
+  gradle.lifecycle.beforeProject {
+    if (path !in projectPaths) return@beforeProject
+    val hooks = project(":kidsmdm-hooks")
+    listOf("com.android.application", "com.android.library").forEach { pluginId ->
+      pluginManager.withPlugin(pluginId) {
+        dependencies.add("implementation", hooks)
       }
     }
   }

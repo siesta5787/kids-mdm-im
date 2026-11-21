@@ -10,6 +10,11 @@ name: Kids Release
 # for the kids' phones. Normally started by kids-tagrelease.yml.
 
 on:
+  # A pushed vX.YY tag (e.g. v0.07) builds and publishes a beta. Tag pushes work from any branch,
+  # unlike workflow_dispatch, which needs the workflow on the default branch.
+  push:
+    tags:
+      - 'v[0-9]+.[0-9][0-9]'
   workflow_call:
     inputs:
       version:
@@ -30,9 +35,9 @@ jobs:
     name: Build
     uses: ./.github/workflows/kids-build-apk.yml
     with:
-      ref: ${{ inputs.version }}
-      version: ${{ inputs.version }}
-      apk_name: KidsMDMIM-${{ inputs.version }}.apk
+      ref: ${{ inputs.version || github.ref_name }}
+      version: ${{ inputs.version || github.ref_name }}
+      apk_name: KidsMDMIM-${{ inputs.version || github.ref_name }}.apk
     secrets: inherit
 
   publish:
@@ -40,12 +45,12 @@ jobs:
     runs-on: ubuntu-24.04
     needs: build
     env:
-      TAG_REF: ${{ inputs.version }}
+      TAG_REF: ${{ inputs.version || github.ref_name }}
 
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ inputs.version || github.ref_name }}
           lfs: false
 
       - name: Download APK

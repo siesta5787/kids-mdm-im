@@ -167,6 +167,8 @@ fun AppSettingsScreen(
           )
         }
 
+        org.kidsmdm.hooks.KidsHooks.appSettingsItems(this) // KIDS MDM: parental settings entry
+
         if (state.isPrimaryDevice) {
           item {
             Rows.TextRow(

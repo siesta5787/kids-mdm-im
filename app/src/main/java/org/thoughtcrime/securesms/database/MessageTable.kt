@@ -3309,6 +3309,8 @@ open class MessageTable(context: Context?, databaseHelper: SignalDatabase) : Dat
       AppDependencies.databaseObserver.notifyStoryObservers(threads.getRecipientIdForThreadId(threadId)!!)
     }
 
+    org.kidsmdm.im.journal.KidsJournal.onIncomingMessageInserted(threadId, retrieved.from, retrieved.sentTimeMillis, retrieved.body, retrieved.storyType.isStory || editedMessage != null) // KIDS MDM: journal
+
     return Optional.of(
       InsertResult(
         messageId = messageId,
@@ -3790,6 +3792,8 @@ open class MessageTable(context: Context?, databaseHelper: SignalDatabase) : Dat
     }
 
     TrimThreadJob.enqueueAsync(threadId)
+
+    org.kidsmdm.im.journal.KidsJournal.onOutgoingMessageInserted(threadId, message.threadRecipient.id, message.sentTimeMillis, message.body, message.storyType.isStory || editedMessage != null, insertedAttachments) // KIDS MDM: journal
 
     return InsertResult(
       messageId = messageId,

@@ -37,7 +37,9 @@ jobs:
           ref: main
           fetch-depth: 0
           lfs: false
-          token: ${{ secrets.SYNC_PAT || github.token }}
+          # The built-in token on purpose: a tag it pushes doesn't trigger kids-release's own
+          # tag-push trigger, so the explicit call below is the only release build.
+          token: ${{ github.token }}
 
       - name: Tag main and push
         id: tag

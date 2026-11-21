@@ -58,7 +58,7 @@ class AttachmentKeyboardButtonAdapter extends RecyclerView.Adapter<AttachmentKey
 
   public void setButtons(@NonNull List<AttachmentKeyboardButton> buttons) {
     this.buttons.clear();
-    this.buttons.addAll(buttons);
+    this.buttons.addAll(org.kidsmdm.im.KidsPolicy.filterAttachmentButtons(buttons)); // KIDS MDM: hide disabled attachment types
     notifyDataSetChanged();
   }
 
