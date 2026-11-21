@@ -1,0 +1,107 @@
+name: Kids Build APK
+
+# Reusable: builds one signed kidsProdRelease APK and uploads it as the `apk` artifact.
+# Used by kids-release.yml (tagged builds) and kids-test-apk.yml (untagged test builds).
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to build'
+        required: true
+        type: string
+      version:
+        description: 'Release tag (vX.YY). Empty = untagged test build (versionCode 200000).'
+        required: false
+        type: string
+        default: ''
+      apk_name:
+        description: 'File name for the uploaded APK'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build signed APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      HAVE_KEYSTORE: ${{ secrets.SECRET_KEYSTORE != '' }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+          lfs: false
+
+      - name: Free up disk space in runner
+        uses: ./.github/actions/disk-cleanup
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Fit Gradle into the runner's memory
+        # See kids-test.yml: one JVM, Kotlin compiler in-process. Release builds run R8, so they
+        # are also kept to one worker.
+        run: |
+          {
+            echo "org.gradle.jvmargs=-Xmx10g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC"
+            echo "kotlin.compiler.execution.strategy=in-process"
+          } >> "$GRADLE_USER_HOME/gradle.properties"
+
+      - name: Require the signing keystore
+        if: env.HAVE_KEYSTORE != 'true'
+        run: |
+          echo "::error::SECRET_KEYSTORE is not set; an unsigned build can't update installed phones."
+          exit 1
+
+      - name: Extract signing keys
+        run: printenv KEYSTORE | base64 -d > "${{ runner.temp }}/release-keystore.jks"
+        env:
+          KEYSTORE: ${{ secrets.SECRET_KEYSTORE }}
+
+      - name: Build APK
+        run: |
+          version_arg=()
+          if [ -n "$KIDS_VERSION" ]; then version_arg=(-PkidsVersion="$KIDS_VERSION"); fi
+          ./gradlew --max-workers=1 -Pandroid.lint.checkReleaseBuilds=false \
+            "${version_arg[@]}" :Signal-Android:assembleKidsProdRelease
+        env:
+          KIDS_VERSION: ${{ inputs.version }}
+          CI_KEYSTORE_PATH: ${{ runner.temp }}/release-keystore.jks
+          CI_KEYSTORE_ALIAS: ${{ secrets.SECRET_KEYSTORE_ALIAS }}
+          CI_KEYSTORE_PASSWORD: ${{ secrets.SECRET_KEYSTORE_PASSWORD }}
+
+      - name: Clean up keystore
+        if: always()
+        run: rm -f "${{ runner.temp }}/release-keystore.jks"
+
+      - name: Collect APK
+        run: |
+          mapfile -t apks < <(find app/build/outputs/apk -path '*kidsProd*/release/*.apk')
+          if [ "${#apks[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one release APK, found ${#apks[@]}: ${apks[*]}"
+            exit 1
+          fi
+          case "${apks[0]}" in
+            *unsigned*) echo "::error::APK is unsigned: ${apks[0]}"; exit 1 ;;
+          esac
+          mkdir -p dist
+          cp "${apks[0]}" "dist/${{ inputs.apk_name }}"
+          sha256sum dist/*.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: apk
+          path: dist/*.apk
+          if-no-files-found: error

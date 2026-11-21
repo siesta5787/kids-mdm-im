@@ -1,0 +1,46 @@
+name: Kids Promote to Stable
+
+# Promotes a tested beta release to stable by clearing its prerelease flag. No rebuild: the
+# stable channel gets the exact APK that was installed on the beta phone.
+#
+#   gh workflow run kids-promote.yml -R siesta5787/kids-mdm-im -f version=0.07
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Beta release to promote, without the leading "v", e.g. 0.07'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    name: Promote
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Promote release
+        run: |
+          version="${{ github.event.inputs.version }}"
+          tag="v${version#v}"
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]{2}$ ]]; then
+            echo "::error::Version must look like 0.07 (got '$version')"
+            exit 1
+          fi
+          info=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isPrerelease,isDraft,assets) || {
+            echo "::error::No release $tag"; exit 1; }
+          if [ "$(jq -r .isDraft <<<"$info")" = "true" ]; then
+            echo "::error::$tag is still a draft"; exit 1
+          fi
+          if [ "$(jq '[.assets[] | select(.name | endswith(".apk"))] | length' <<<"$info")" -ne 1 ]; then
+            echo "::error::$tag must have exactly one .apk asset"; exit 1
+          fi
+          if [ "$(jq -r .isPrerelease <<<"$info")" != "true" ]; then
+            echo "::notice::$tag is already stable"; exit 0
+          fi
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest --title "$tag"
+          echo "::notice::Promoted $tag to stable"
+        env:
+          GH_TOKEN: ${{ secrets.PUBLISH_PAT || secrets.GITHUB_TOKEN }}

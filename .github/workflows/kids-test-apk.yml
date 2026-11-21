@@ -1,0 +1,29 @@
+name: Kids Test APK
+
+# Signed APK of `next` as a downloadable workflow artifact, for side-loading on a test phone.
+# Deliberately NOT a GitHub release, so kid-phone-server can never pick it up. Untagged builds get
+# versionCode 200000, lower than every tagged release, so a real release always upgrades over it.
+#
+#   gh run download -R siesta5787/kids-mdm-im -n apk <run-id>
+
+on:
+  push:
+    branches:
+      - next
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kids-test-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/kids-build-apk.yml
+    with:
+      ref: ${{ github.sha }}
+      apk_name: KidsMDMIM-test-${{ github.sha }}.apk
+    secrets: inherit

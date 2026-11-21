@@ -5,6 +5,8 @@ name: Kids Signal Sync
 #   2. merge that tag into a sync/<tag> branch (a real merge commit, so history stays mergeable)
 #   3. build + unit test it with kids-test.yml
 #   4. fast-forward main to it if everything is green
+#   5. tag the next vX.YY and publish it as a *beta* (prerelease); kids' phones only get it after
+#      it's promoted with kids-promote.yml
 # A merge conflict or a failed build stops the run and opens an issue; main is never touched.
 #
 # Signal's own .github/workflows files are deleted in this repo (they would retarget our PRs,
@@ -163,16 +165,23 @@ jobs:
           git push origin "HEAD:refs/heads/$TARGET_BRANCH"
           git push origin --delete "${{ needs.merge.outputs.branch }}"
 
+  beta_release:
+    name: Cut a beta release
+    needs: [merge, finalize]
+    if: needs.merge.outputs.branch != ''
+    uses: ./.github/workflows/kids-tagrelease.yml
+    secrets: inherit
+
   report_failure:
     name: Report failed build
-    needs: [merge, test]
+    needs: [merge, test, finalize, beta_release]
     if: failure() && needs.merge.outputs.branch != ''
     runs-on: ubuntu-24.04
     steps:
       - name: Open an issue
         run: |
           gh issue create --repo "$GITHUB_REPOSITORY" \
-            --title "Signal sync: ${{ needs.merge.outputs.tag }} failed to build or test" \
-            --body "The merge of Signal ${{ needs.merge.outputs.tag }} is on branch \`${{ needs.merge.outputs.branch }}\` but did not pass kids-test, so $TARGET_BRANCH was left alone. Run log: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            --title "Signal sync: ${{ needs.merge.outputs.tag }} failed" \
+            --body "Syncing Signal ${{ needs.merge.outputs.tag }} (branch \`${{ needs.merge.outputs.branch }}\`) failed in the test, fast-forward or beta-release step. If the test failed, $TARGET_BRANCH was left alone. Run log: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
         env:
           GH_TOKEN: ${{ github.token }}

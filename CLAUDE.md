@@ -63,14 +63,34 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
 - **Dependency verification is strict** (`gradle/verification-metadata.xml`). Adding an external
   dependency means writing checksums. Prefer code that needs none.
 
+## Release channels (beta → stable)
+
+Every build is published as a GitHub **prerelease**, which is the **beta** channel. "Promote"
+(`kids-promote.yml`) clears the prerelease flag on that same release, so stable phones get
+byte-for-byte the APK that was tested. Nothing is rebuilt. kid-phone-server needs no code for
+this; its app catalog has two entries for this repo:
+
+- **Kids MDM IM (beta)**: "Include prereleases" on, hold 0 days. Selected only on the parent's test phone.
+- **Kids MDM IM**: prereleases off. Selected on the kids' phones.
+
+The server installs the first `.apk` of the newest release the entry allows, and holds a release
+for review if its package, signing key or permissions change, or its versionCode goes down.
+
 ## CI
 
 | Workflow | What |
 |---|---|
 | `kids-test.yml` | PRs + pushes to `main`/`next`: `assembleKidsProdDebug` + `testKidsProdDebugUnitTest` + `processKidsProdReleaseResources` (checks the release-only branding overlay merges) |
-| `kids-tagrelease.yml` | `gh workflow run kids-tagrelease.yml -R siesta5787/kids-mdm-im -f version=0.07`: tags `main`, calls release |
-| `kids-release.yml` | signed `kidsProdRelease`, version-code check, uploads `KidsMDMIM-vX.YY.apk` |
-| `kids-sync.yml` | twice daily: Signal stable (from `updates.signal.org/android/latest.json`) → `sync/signal-vX` → test → fast-forward `main`; issue on conflict or failure; mirrors the release to `signal-stable` |
+| `kids-test-apk.yml` | pushes to `next`: signed release APK as a workflow **artifact** (not a release) for side-loading. versionCode 200000. |
+| `kids-build-apk.yml` | reusable: builds one signed `kidsProdRelease` APK |
+| `kids-tagrelease.yml` | `gh workflow run kids-tagrelease.yml -R siesta5787/kids-mdm-im [-f version=X.YY]`: tags `main` (default: next version after the highest `vX.YY`), then calls release |
+| `kids-release.yml` | builds the tag, checks its versionCode beats every other release, publishes `KidsMDMIM-vX.YY.apk` as a **beta prerelease** |
+| `kids-promote.yml` | `gh workflow run kids-promote.yml -R siesta5787/kids-mdm-im -f version=X.YY`: beta → stable |
+| `kids-sync.yml` | twice daily: Signal stable (from `updates.signal.org/android/latest.json`) → `sync/signal-vX` → test → fast-forward `main` → automatic beta release; opens an issue on conflict or failure; mirrors the release to `signal-stable` |
+
+`workflow_dispatch` and `schedule` only work for workflows on the default branch. Until cutover
+makes this branch `main`, tag, release, promote and sync can't run. Only `kids-test` and
+`kids-test-apk` can.
 
 Secrets: `SECRET_KEYSTORE` (base64 PKCS12), `SECRET_KEYSTORE_ALIAS=kidsmdm`,
 `SECRET_KEYSTORE_PASSWORD` (shared Kids MDM release key, cert SHA-256
@@ -85,8 +105,10 @@ fetched (`GIT_LFS_SKIP_SMUDGE=1`); they aren't needed to build.
 ## Rebase status (see the plan in the Kids MDM memory / chat of 2026-11-20)
 
 - [x] Phase 1: skeleton (flavor, package, signing, branding, CI)
-- [ ] Phase 2: FOSS (microG-based `core-gms` from Molly + stubs via dependency substitution;
-      own Firebase project with Signal's sender ID 312334754206)
+- [ ] Phase 2: FOSS. Swap every Google library (firebase-messaging, play-services-*, play core,
+      billing, wallet, credentials compat, googleid) for do-nothing stub modules via Gradle dependency
+      substitution. **No Google push at all** (decided 2026-11-20): delivery is UnifiedPush (Phase 6)
+      or Signal's own websocket fallback, so no Firebase project is needed.
 - [ ] Phase 3: port journal, call blocking, GIF-off; app-wide parental PIN gate
 - [ ] Phase 4: hide payments/donations/megaphones/prompts (forced remote config + few hooks);
       disable location sharing

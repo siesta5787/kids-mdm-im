@@ -1,17 +1,25 @@
 name: Kids Tag Release
 
-# Tags the head of main as vX.YY and builds/publishes it. The Android versionCode is derived
-# from the tag (see build-logic/plugins/src/main/java/kidsmdm-app.gradle.kts), so no
-# version-bump commit is needed.
+# Tags the head of main as vX.YY and builds it as a beta release (see kids-release.yml).
+# Leave the version empty to use the next one after the highest existing vX.YY tag. The Android
+# versionCode is derived from the tag (build-logic/plugins/src/main/java/kidsmdm-app.gradle.kts),
+# so no version-bump commit is needed. kids-sync.yml calls this after every Signal merge.
 #
-#   gh workflow run kids-tagrelease.yml -R siesta5787/kids-mdm-im -f version=0.07
+#   gh workflow run kids-tagrelease.yml -R siesta5787/kids-mdm-im            # next version
+#   gh workflow run kids-tagrelease.yml -R siesta5787/kids-mdm-im -f version=1.00
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version without the leading "v", e.g. 0.07'
-        required: true
+        description: 'Release version without the leading "v" (e.g. 0.07). Empty = next version.'
+        required: false
+  workflow_call:
+    inputs:
+      version:
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -29,11 +37,22 @@ jobs:
           ref: main
           fetch-depth: 0
           lfs: false
+          token: ${{ secrets.SYNC_PAT || github.token }}
 
       - name: Tag main and push
         id: tag
         run: |
-          version="${{ github.event.inputs.version }}"
+          version="${INPUT_VERSION#v}"
+          if [ -z "$version" ]; then
+            # Only our own vX.YY tags; Molly/Signal-era v8.x.y tags never match this pattern.
+            last=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]{2}$' | sort -V | tail -1)
+            last=${last:-v0.00}
+            major=${last#v}; minor=${major#*.}; major=${major%.*}
+            minor=$((10#$minor + 1))
+            if [ "$minor" -ge 100 ]; then major=$((major + 1)); minor=0; fi
+            version=$(printf '%d.%02d' "$major" "$minor")
+            echo "Last release $last, next $version"
+          fi
           if ! [[ "$version" =~ ^[0-9]+\.[0-9]{2}$ ]]; then
             echo "::error::Version must look like 0.07 or 1.00 (got '$version')"
             exit 1
@@ -46,6 +65,8 @@ jobs:
           git tag "$tag"
           git push origin "$tag"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
 
   release:
     name: Release

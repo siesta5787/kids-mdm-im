@@ -1,8 +1,13 @@
 name: Kids Release
 
 # Builds a signed kidsProdRelease APK for an existing vX.YY tag and publishes it as a GitHub
-# release. kid-phone-server installs the first .apk asset of the latest release, so exactly one
-# arm64 APK is uploaded. Normally started by kids-tagrelease.yml.
+# **prerelease** (the beta channel). Nothing reaches the kids' phones until the release is
+# promoted with kids-promote.yml, which just clears the prerelease flag on this same release, so
+# stable phones get exactly the APK that was tested on beta.
+#
+# kid-phone-server installs the first .apk asset of the newest matching release; its catalog has
+# a "beta" entry (include prereleases) for the test phone and a "stable" entry (no prereleases)
+# for the kids' phones. Normally started by kids-tagrelease.yml.
 
 on:
   workflow_call:
@@ -20,94 +25,27 @@ on:
 permissions:
   contents: write
 
-env:
-  TAG_REF: ${{ inputs.version }}
-  HAVE_KEYSTORE: ${{ secrets.SECRET_KEYSTORE != '' }}
-
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 180
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ env.TAG_REF }}
-          lfs: false
-
-      - name: Free up disk space in runner
-        uses: ./.github/actions/disk-cleanup
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
-
-      - name: Fit Gradle into the runner's memory
-        # See kids-test.yml: one JVM, Kotlin compiler in-process. Release builds run R8, so they
-        # are also kept to one worker.
-        run: |
-          {
-            echo "org.gradle.jvmargs=-Xmx10g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC"
-            echo "kotlin.compiler.execution.strategy=in-process"
-          } >> "$GRADLE_USER_HOME/gradle.properties"
-
-      - name: Require the signing keystore
-        if: env.HAVE_KEYSTORE != 'true'
-        run: |
-          echo "::error::SECRET_KEYSTORE is not set; an unsigned build can't update installed phones."
-          exit 1
-
-      - name: Extract signing keys
-        run: printenv KEYSTORE | base64 -d > "${{ runner.temp }}/release-keystore.jks"
-        env:
-          KEYSTORE: ${{ secrets.SECRET_KEYSTORE }}
-
-      - name: Build APK
-        run: |
-          ./gradlew --max-workers=1 -Pandroid.lint.checkReleaseBuilds=false \
-            -PkidsVersion="${TAG_REF}" :Signal-Android:assembleKidsProdRelease
-        env:
-          CI_KEYSTORE_PATH: ${{ runner.temp }}/release-keystore.jks
-          CI_KEYSTORE_ALIAS: ${{ secrets.SECRET_KEYSTORE_ALIAS }}
-          CI_KEYSTORE_PASSWORD: ${{ secrets.SECRET_KEYSTORE_PASSWORD }}
-
-      - name: Clean up keystore
-        if: always()
-        run: rm -f "${{ runner.temp }}/release-keystore.jks"
-
-      - name: Collect APK
-        run: |
-          mapfile -t apks < <(find app/build/outputs/apk -path '*kidsProd*/release/*.apk')
-          if [ "${#apks[@]}" -ne 1 ]; then
-            echo "::error::Expected exactly one release APK, found ${#apks[@]}: ${apks[*]}"
-            exit 1
-          fi
-          mkdir -p dist
-          cp "${apks[0]}" "dist/KidsMDMIM-${TAG_REF}.apk"
-          sha256sum dist/*.apk
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: apk
-          path: dist/*.apk
-          if-no-files-found: error
+    uses: ./.github/workflows/kids-build-apk.yml
+    with:
+      ref: ${{ inputs.version }}
+      version: ${{ inputs.version }}
+      apk_name: KidsMDMIM-${{ inputs.version }}.apk
+    secrets: inherit
 
   publish:
-    name: Publish
+    name: Publish to beta
     runs-on: ubuntu-24.04
     needs: build
+    env:
+      TAG_REF: ${{ inputs.version }}
 
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ env.TAG_REF }}
+          ref: ${{ inputs.version }}
           lfs: false
 
       - name: Download APK
@@ -122,22 +60,28 @@ jobs:
           version_code() { "$aapt" d badging "$1" | sed -n "s/^package:.*versionCode='\([0-9]*\)'.*/\1/p"; }
           build_code=$(version_code dist/*.apk)
           echo "Build version code: $build_code"
-          mkdir -p latest
-          if gh release download --pattern '*.apk' --dir latest 2>/dev/null; then
+          # Compare against the newest release of any kind (beta or stable), excluding this tag.
+          latest=$(gh release list --exclude-drafts --limit 20 --json tagName -q '.[].tagName' \
+            | grep -E '^v[0-9]+\.[0-9]{2}$' | grep -vx "$TAG_REF" | sort -V | tail -1 || true)
+          if [ -n "$latest" ]; then
+            mkdir -p latest
+            gh release download "$latest" --pattern '*.apk' --dir latest
             latest_code=$(version_code latest/*.apk)
-            echo "Latest release version code: $latest_code"
+            echo "Newest other release $latest has version code $latest_code"
             if [ "$build_code" -le "$latest_code" ]; then
-              echo "::error::Version code $build_code is not greater than the latest release's $latest_code"
+              echo "::error::Version code $build_code is not greater than $latest's $latest_code"
               exit 1
             fi
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create or update the release
+      - name: Create or update the beta release
         run: |
           if ! gh release view "$TAG_REF" >/dev/null 2>&1; then
-            gh release create "$TAG_REF" --verify-tag --title "$TAG_REF" --notes "Kids MDM IM $TAG_REF"
+            gh release create "$TAG_REF" --verify-tag --prerelease --latest=false \
+              --title "$TAG_REF (beta)" \
+              --notes "Beta build of Kids MDM IM $TAG_REF. Promote with kids-promote.yml once it's been tested on the beta phone."
           fi
           gh release upload "$TAG_REF" dist/*.apk --clobber
         env:
