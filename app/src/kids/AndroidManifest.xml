@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Kids MDM IM manifest overlay, merged on top of Signal's app/src/main/AndroidManifest.xml for the
+  `kids` flavor only. Keep Kids-specific manifest changes here instead of editing Signal's file.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Signal requests org.thoughtcrime.securesms.ACCESS_SECRETS (hard-coded), but declares the
+         permission as ${applicationId}.ACCESS_SECRETS and KeyCachingService broadcasts with
+         that name, so under our package we have to request our own one. -->
+    <uses-permission android:name="${applicationId}.ACCESS_SECRETS" />
+
+</manifest>

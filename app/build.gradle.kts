@@ -26,6 +26,7 @@ plugins {
   id("translations")
   id("licenses")
   id("pseudo-locales")
+  id("kidsmdm-app") // KIDS MDM: all build customizations live in build-logic/plugins/src/main/java/kidsmdm-app.gradle.kts
 }
 
 val staticIps = Properties().apply { file("static-ips.properties").reader().use { load(it) } }

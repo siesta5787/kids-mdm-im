@@ -1,0 +1,178 @@
+name: Kids Signal Sync
+
+# Merges Signal's current *stable* release into main automatically:
+#   1. read the stable version Signal publishes at updates.signal.org/android/latest.json
+#   2. merge that tag into a sync/<tag> branch (a real merge commit, so history stays mergeable)
+#   3. build + unit test it with kids-test.yml
+#   4. fast-forward main to it if everything is green
+# A merge conflict or a failed build stops the run and opens an issue; main is never touched.
+#
+# Signal's own .github/workflows files are deleted in this repo (they would retarget our PRs,
+# run a stale bot, etc.). If Signal edits one, the merge reports a modify/delete conflict; that
+# one kind of conflict is resolved automatically by keeping the deletion.
+#
+# Needs a SYNC_PAT secret: a fine-grained token for this repo with Contents and Workflows
+# read/write. GitHub refuses pushes made with the default GITHUB_TOKEN when the pushed commits
+# touch .github/workflows, which Signal's history does.
+
+on:
+  schedule:
+    - cron: '30 3,15 * * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Signal tag to merge instead of the current stable one (e.g. v8.37.1)'
+        required: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: kids-sync
+  cancel-in-progress: false
+
+env:
+  TARGET_BRANCH: main
+  SIGNAL_REMOTE: https://github.com/signalapp/Signal-Android.git
+  GIT_LFS_SKIP_SMUDGE: 1
+
+jobs:
+  merge:
+    name: Merge Signal release
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.stable.outputs.tag }}
+      branch: ${{ steps.merge.outputs.branch }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          lfs: false
+          token: ${{ secrets.SYNC_PAT || github.token }}
+
+      - name: Find Signal's stable release
+        id: stable
+        run: |
+          tag="${{ github.event.inputs.tag }}"
+          if [ -z "$tag" ]; then
+            tag="v$(curl -fsSL https://updates.signal.org/android/latest.json | jq -r .versionName)"
+          fi
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Unexpected Signal version '$tag'"
+            exit 1
+          fi
+          echo "Signal stable: $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch the Signal tag
+        id: fetch
+        run: |
+          tag="${{ steps.stable.outputs.tag }}"
+          git remote add signal "$SIGNAL_REMOTE"
+          # Keep Signal's tags out of our tag namespace: our own release tags are also v*.
+          if ! git fetch --no-tags signal "refs/tags/$tag:refs/signal-tags/$tag"; then
+            echo "::notice::Signal hasn't pushed $tag to GitHub yet; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git merge-base --is-ancestor "refs/signal-tags/$tag" HEAD; then
+            echo "::notice::$tag is already merged into $TARGET_BRANCH."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Mirror the release so it's easy to diff against.
+          git push -f origin "refs/signal-tags/$tag^{commit}:refs/heads/signal-stable"
+
+      - name: Merge
+        id: merge
+        if: steps.fetch.outputs.skip != 'true'
+        run: |
+          tag="${{ steps.stable.outputs.tag }}"
+          branch="sync/signal-$tag"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+
+          if ! git merge --no-ff --no-edit -m "Merge Signal $tag" "refs/signal-tags/$tag"; then
+            # Keep our deletion of Signal's workflow files; anything else needs a human.
+            # Ours are all named kids-*; any other conflicted workflow file is one of Signal's.
+            git diff --name-only --diff-filter=U | while read -r path; do
+              case "$path" in
+                .github/workflows/kids-*) ;;
+                .github/workflows/*) git rm -q -- "$path" ;;
+              esac
+            done
+            remaining=$(git diff --name-only --diff-filter=U)
+            if [ -n "$remaining" ]; then
+              echo "::error::Merging $tag needs manual conflict resolution in:"
+              echo "$remaining"
+              {
+                echo "conflicts<<EOF"
+                echo "$remaining"
+                echo "EOF"
+              } >> "$GITHUB_OUTPUT"
+              git merge --abort
+              exit 1
+            fi
+            git commit --no-edit
+          fi
+
+          git push -f origin "$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Open an issue about the conflict
+        if: failure() && steps.merge.outputs.conflicts != ''
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "Signal sync: ${{ steps.stable.outputs.tag }} needs a manual merge" \
+            --body "$(printf 'The automatic merge of Signal %s into %s hit conflicts in:\n\n```\n%s\n```\n\nRun log: %s' \
+              "${{ steps.stable.outputs.tag }}" "$TARGET_BRANCH" "${{ steps.merge.outputs.conflicts }}" \
+              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  test:
+    name: Test merged branch
+    needs: merge
+    if: needs.merge.outputs.branch != ''
+    uses: ./.github/workflows/kids-test.yml
+    with:
+      ref: ${{ needs.merge.outputs.branch }}
+
+  finalize:
+    name: Fast-forward main
+    needs: [merge, test]
+    if: needs.merge.outputs.branch != ''
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.merge.outputs.branch }}
+          fetch-depth: 0
+          lfs: false
+          token: ${{ secrets.SYNC_PAT || github.token }}
+
+      - name: Push to main
+        run: |
+          # Plain push (no --force): if main moved while we were testing, this fails and the next
+          # scheduled run redoes the merge on top of the new main.
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          git push origin --delete "${{ needs.merge.outputs.branch }}"
+
+  report_failure:
+    name: Report failed build
+    needs: [merge, test]
+    if: failure() && needs.merge.outputs.branch != ''
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Open an issue
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "Signal sync: ${{ needs.merge.outputs.tag }} failed to build or test" \
+            --body "The merge of Signal ${{ needs.merge.outputs.tag }} is on branch \`${{ needs.merge.outputs.branch }}\` but did not pass kids-test, so $TARGET_BRANCH was left alone. Run log: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        env:
+          GH_TOKEN: ${{ github.token }}

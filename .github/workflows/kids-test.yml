@@ -1,0 +1,72 @@
+name: Kids Test
+
+# Builds the one variant we ship (kidsProdDebug) and runs the app's unit tests.
+# Signal's own workflows are removed from this repo (see kids-sync.yml), so this is the only
+# check that runs on pull requests.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - next
+  workflow_call:
+    inputs:
+      ref:
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kids-test-${{ inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and unit test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || '' }}
+          lfs: false
+
+      - name: Free up disk space in runner
+        uses: ./.github/actions/disk-cleanup
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # One JVM for everything: the Kotlin compiler runs inside Gradle's process (as Molly's CI
+      # does) instead of a separate daemon, because Signal's app module needs more than a split
+      # heap leaves it. A 3 GB Kotlin daemon OOMed after 2+ hours of GC thrashing on the 16 GB
+      # runner. GRADLE_USER_HOME properties override the project's, so Signal's file is untouched.
+      - name: Fit Gradle into the runner's memory
+        run: |
+          {
+            echo "org.gradle.jvmargs=-Xmx10g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC"
+            echo "kotlin.compiler.execution.strategy=in-process"
+          } >> "$GRADLE_USER_HOME/gradle.properties"
+
+      - name: Build and run unit tests
+        run: ./gradlew --max-workers=2 :Signal-Android:assembleKidsProdDebug :Signal-Android:testKidsProdDebugUnitTest :Signal-Android:processKidsProdReleaseResources
+
+      - name: Archive reports for failed build
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-${{ github.run_id }}
+          path: |
+            **/build/reports
+            **/build/test-results
+          if-no-files-found: ignore

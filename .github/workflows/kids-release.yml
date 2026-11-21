@@ -1,0 +1,144 @@
+name: Kids Release
+
+# Builds a signed kidsProdRelease APK for an existing vX.YY tag and publishes it as a GitHub
+# release. kid-phone-server installs the first .apk asset of the latest release, so exactly one
+# arm64 APK is uploaded. Normally started by kids-tagrelease.yml.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Tag to release, e.g. v0.07'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Existing tag to (re)build, e.g. v0.07'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG_REF: ${{ inputs.version }}
+  HAVE_KEYSTORE: ${{ secrets.SECRET_KEYSTORE != '' }}
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TAG_REF }}
+          lfs: false
+
+      - name: Free up disk space in runner
+        uses: ./.github/actions/disk-cleanup
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Fit Gradle into the runner's memory
+        # See kids-test.yml: one JVM, Kotlin compiler in-process. Release builds run R8, so they
+        # are also kept to one worker.
+        run: |
+          {
+            echo "org.gradle.jvmargs=-Xmx10g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC"
+            echo "kotlin.compiler.execution.strategy=in-process"
+          } >> "$GRADLE_USER_HOME/gradle.properties"
+
+      - name: Require the signing keystore
+        if: env.HAVE_KEYSTORE != 'true'
+        run: |
+          echo "::error::SECRET_KEYSTORE is not set; an unsigned build can't update installed phones."
+          exit 1
+
+      - name: Extract signing keys
+        run: printenv KEYSTORE | base64 -d > "${{ runner.temp }}/release-keystore.jks"
+        env:
+          KEYSTORE: ${{ secrets.SECRET_KEYSTORE }}
+
+      - name: Build APK
+        run: |
+          ./gradlew --max-workers=1 -Pandroid.lint.checkReleaseBuilds=false \
+            -PkidsVersion="${TAG_REF}" :Signal-Android:assembleKidsProdRelease
+        env:
+          CI_KEYSTORE_PATH: ${{ runner.temp }}/release-keystore.jks
+          CI_KEYSTORE_ALIAS: ${{ secrets.SECRET_KEYSTORE_ALIAS }}
+          CI_KEYSTORE_PASSWORD: ${{ secrets.SECRET_KEYSTORE_PASSWORD }}
+
+      - name: Clean up keystore
+        if: always()
+        run: rm -f "${{ runner.temp }}/release-keystore.jks"
+
+      - name: Collect APK
+        run: |
+          mapfile -t apks < <(find app/build/outputs/apk -path '*kidsProd*/release/*.apk')
+          if [ "${#apks[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one release APK, found ${#apks[@]}: ${apks[*]}"
+            exit 1
+          fi
+          mkdir -p dist
+          cp "${apks[0]}" "dist/KidsMDMIM-${TAG_REF}.apk"
+          sha256sum dist/*.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: apk
+          path: dist/*.apk
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    runs-on: ubuntu-24.04
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TAG_REF }}
+          lfs: false
+
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: dist
+
+      - name: Check version code is newer than the latest release
+        run: |
+          aapt=$(ls "$ANDROID_HOME"/build-tools/*/aapt | sort -V | tail -1)
+          version_code() { "$aapt" d badging "$1" | sed -n "s/^package:.*versionCode='\([0-9]*\)'.*/\1/p"; }
+          build_code=$(version_code dist/*.apk)
+          echo "Build version code: $build_code"
+          mkdir -p latest
+          if gh release download --pattern '*.apk' --dir latest 2>/dev/null; then
+            latest_code=$(version_code latest/*.apk)
+            echo "Latest release version code: $latest_code"
+            if [ "$build_code" -le "$latest_code" ]; then
+              echo "::error::Version code $build_code is not greater than the latest release's $latest_code"
+              exit 1
+            fi
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create or update the release
+        run: |
+          if ! gh release view "$TAG_REF" >/dev/null 2>&1; then
+            gh release create "$TAG_REF" --verify-tag --title "$TAG_REF" --notes "Kids MDM IM $TAG_REF"
+          fi
+          gh release upload "$TAG_REF" dist/*.apk --clobber
+        env:
+          GH_TOKEN: ${{ secrets.PUBLISH_PAT || secrets.GITHUB_TOKEN }}
