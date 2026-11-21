@@ -58,6 +58,9 @@ jobs:
             echo "kotlin.compiler.execution.strategy=in-process"
           } >> "$GRADLE_USER_HOME/gradle.properties"
 
+      - name: Check no Google libraries ship
+        run: kidsmdm/scripts/check-no-google.sh
+
       - name: Build and run unit tests
         run: ./gradlew --max-workers=2 :Signal-Android:assembleKidsProdDebug :Signal-Android:testKidsProdDebugUnitTest :Signal-Android:processKidsProdReleaseResources
 

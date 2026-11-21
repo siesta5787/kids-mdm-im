@@ -33,6 +33,7 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
 | File | Why |
 |---|---|
 | `app/build.gradle.kts` | one line: `id("kidsmdm-app")` |
+| `settings.gradle.kts` | one line at the end: `apply(from = "kidsmdm/settings.gradle.kts")`, which swaps every Google library for a stub in `kidsmdm/stubs/` (see its README) |
 | `.github/workflows/*` (Signal's) | deleted: they'd retarget our PRs to release branches, run a stale bot, etc. The sync job auto-resolves Signal edits to them by keeping the deletion. |
 
 ## Build details
@@ -80,7 +81,7 @@ for review if its package, signing key or permissions change, or its versionCode
 
 | Workflow | What |
 |---|---|
-| `kids-test.yml` | PRs + pushes to `main`/`next`: `assembleKidsProdDebug` + `testKidsProdDebugUnitTest` + `processKidsProdReleaseResources` (checks the release-only branding overlay merges) |
+| `kids-test.yml` | PRs + pushes to `main`/`next`: `kidsmdm/scripts/check-no-google.sh` (fails if any Google artifact would ship) + `assembleKidsProdDebug` + `testKidsProdDebugUnitTest` + `processKidsProdReleaseResources` (checks the release-only branding overlay merges) |
 | `kids-test-apk.yml` | pushes to `next`: signed release APK as a workflow **artifact** (not a release) for side-loading. versionCode 200000. |
 | `kids-build-apk.yml` | reusable: builds one signed `kidsProdRelease` APK |
 | `kids-tagrelease.yml` | `gh workflow run kids-tagrelease.yml -R siesta5787/kids-mdm-im [-f version=X.YY]`: tags `main` (default: next version after the highest `vX.YY`), then calls release |
@@ -105,7 +106,7 @@ fetched (`GIT_LFS_SKIP_SMUDGE=1`); they aren't needed to build.
 ## Rebase status (see the plan in the Kids MDM memory / chat of 2026-11-20)
 
 - [x] Phase 1: skeleton (flavor, package, signing, branding, CI)
-- [ ] Phase 2: FOSS. Swap every Google library (firebase-messaging, play-services-*, play core,
+- [x] Phase 2: FOSS. Swap every Google library (firebase-messaging, play-services-*, play core,
       billing, wallet, credentials compat, googleid) for do-nothing stub modules via Gradle dependency
       substitution. **No Google push at all** (decided 2026-11-20): delivery is UnifiedPush (Phase 6)
       or Signal's own websocket fallback, so no Firebase project is needed.

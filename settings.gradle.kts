@@ -168,3 +168,6 @@ include(":language-split-tests")
 project(":app").name = "Signal-Android"
 
 rootProject.name = "Signal"
+
+// KIDS MDM: FOSS stand-ins for Google libraries; see kidsmdm/settings.gradle.kts
+apply(from = "kidsmdm/settings.gradle.kts")

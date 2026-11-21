@@ -3,11 +3,23 @@
   Kids MDM IM manifest overlay, merged on top of Signal's app/src/main/AndroidManifest.xml for the
   `kids` flavor only. Keep Kids-specific manifest changes here instead of editing Signal's file.
 -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Signal requests org.thoughtcrime.securesms.ACCESS_SECRETS (hard-coded), but declares the
          permission as ${applicationId}.ACCESS_SECRETS and KeyCachingService broadcasts with
          that name, so under our package we have to request our own one. -->
     <uses-permission android:name="${applicationId}.ACCESS_SECRETS" />
+
+    <application>
+        <!-- No Google libraries ship (kidsmdm/settings.gradle.kts), so drop Signal's Google meta-data:
+             the Maps API key, the Google Pay flag and the Play services version. -->
+        <meta-data android:name="com.google.android.gms.wallet.api.enabled" tools:node="remove" />
+        <meta-data android:name="com.google.android.geo.API_KEY" tools:node="remove" />
+        <meta-data android:name="com.google.android.gms.version" tools:node="remove" />
+
+        <!-- No FCM: nothing can ever deliver to Signal's Firebase receiver. -->
+        <service android:name="org.thoughtcrime.securesms.gcm.FcmReceiveService" tools:node="remove" />
+    </application>
 
 </manifest>

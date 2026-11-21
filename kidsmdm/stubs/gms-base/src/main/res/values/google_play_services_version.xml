@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Kids MDM IM: referenced by Signal's manifest (com.google.android.gms.version meta-data). -->
+<resources>
+    <integer name="google_play_services_version">0</integer>
+</resources>
