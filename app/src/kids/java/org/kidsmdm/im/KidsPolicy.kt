@@ -17,6 +17,9 @@ object KidsPolicy {
    */
   const val LOCATION_SHARING_ENABLED = false
 
+  /** No Donate item in the main screen's menu (the Settings row is hidden via [HIDDEN_APP_SETTINGS_ROWS]). */
+  const val DONATIONS_ENABLED = false
+
   /** No "invite to Signal" anywhere (entry points hidden; [blockInvite] catches the rest). */
   const val INVITES_ENABLED = false
 

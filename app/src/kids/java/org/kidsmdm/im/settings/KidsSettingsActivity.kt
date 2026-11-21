@@ -29,6 +29,11 @@ class KidsSettingsActivity : BaseActivity() {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.kidsmdm_activity_settings)
 
+    findViewById<MaterialSwitch>(R.id.kidsmdm_block_unknown_contacts).apply {
+      isChecked = KidsSettings.blockUnknownContacts
+      setOnCheckedChangeListener { _, checked -> KidsSettings.blockUnknownContacts = checked }
+    }
+
     findViewById<MaterialSwitch>(R.id.kidsmdm_block_voice_calls).apply {
       isChecked = KidsSettings.blockVoiceCalls
       setOnCheckedChangeListener { _, checked -> KidsSettings.blockVoiceCalls = checked }

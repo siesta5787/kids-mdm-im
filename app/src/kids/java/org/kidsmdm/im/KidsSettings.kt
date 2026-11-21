@@ -21,6 +21,7 @@ object KidsSettings {
   private const val PIN_HASH = "parental_pin.hash"
   private const val BLOCK_VOICE_CALLS = "call_blocking.block_voice"
   private const val BLOCK_VIDEO_CALLS = "call_blocking.block_video"
+  private const val BLOCK_UNKNOWN_CONTACTS = "contacts.block_unknown"
 
   @Volatile
   private var prefs: SharedPreferences? = null
@@ -42,4 +43,9 @@ object KidsSettings {
   var blockVideoCalls: Boolean
     get() = prefs?.getBoolean(BLOCK_VIDEO_CALLS, false) ?: false
     set(value) = requirePrefs().edit { putBoolean(BLOCK_VIDEO_CALLS, value) }
+
+  /** See [KidsContactFilter]. Off by default, like Molly. */
+  var blockUnknownContacts: Boolean
+    get() = prefs?.getBoolean(BLOCK_UNKNOWN_CONTACTS, false) ?: false
+    set(value) = requirePrefs().edit { putBoolean(BLOCK_UNKNOWN_CONTACTS, value) }
 }

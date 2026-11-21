@@ -578,6 +578,7 @@ private fun HeadsUpIndicator(state: MainToolbarState, modifier: Modifier = Modif
 
 @Composable
 private fun DonateDropdownItem(callback: MainToolbarCallback, onOptionSelected: () -> Unit) {
+  if (!org.kidsmdm.im.KidsPolicy.DONATIONS_ENABLED) return // KIDS MDM: no donations
   DropdownMenus.Item(
     leadingIconResId = R.drawable.symbol_heart_24,
     text = {

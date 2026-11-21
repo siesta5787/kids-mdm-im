@@ -149,6 +149,7 @@ open class MessageContentProcessor(private val context: Context) {
 
     @Throws(BadGroupIdException::class)
     private fun shouldIgnore(content: Content, senderRecipient: Recipient, threadRecipient: Recipient): Boolean {
+      if (org.kidsmdm.im.KidsContactFilter.shouldIgnore(content, senderRecipient, threadRecipient)) return true // KIDS MDM: block unknown contacts
       if (content.dataMessage != null) {
         return shouldIgnoreDataMessage(content.dataMessage!!, senderRecipient, threadRecipient)
       } else if (content.editMessage != null) {

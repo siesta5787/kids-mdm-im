@@ -51,6 +51,8 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
 | `ContactSelectionListFragment.java` | one line: no "Invite to Signal" row in contact pickers |
 | `conversation/NewConversationActivity.kt`, `calls/new/NewCallActivity.kt` | one line each: no "Invite friends" menu item |
 | `conversation/v2/DisabledInputView.kt` | one line: no invite button on non-Signal contacts |
+| `main/MainToolbar.kt` | one line: no Donate item in the chats/calls/stories menu (`KidsPolicy.DONATIONS_ENABLED`) |
+| `messages/MessageContentProcessor.kt` | one line at the top of `shouldIgnore`: drop content from unknown senders (`KidsContactFilter`) |
 | `.github/workflows/*` (Signal's) | deleted: they'd retarget our PRs to release branches, run a stale bot, etc. The sync job auto-resolves Signal edits to them by keeping the deletion. |
 
 ## Where our code lives
@@ -74,7 +76,8 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
     ones on the server, which groups conversations by `thread_id`.
   - `KidsCallBlocking`, `KidsPolicy` (feature switches: location, invites, megaphones, prompts,
     hidden settings rows, attachment buttons), `KidsForcedConfig` (forced remote config: GIF search,
-    payments kill switch, call-quality survey, backup megaphones, Jetpack Telecom off).
+    payments kill switch, call-quality survey, backup megaphones), `KidsContactFilter` (block
+    unknown contacts).
 - `kidsmdm/hooks` (`:kidsmdm-hooks`): hook points for Signal's *library* modules, which can't see
   app code. `kidsmdm/settings.gradle.kts` adds the dependency to those modules, so their build files
   stay untouched.
@@ -103,9 +106,11 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
 - **Label only, no rebrand**: the `generateKidsAppLabel` task sets `app_name` to "Kids MDM IM" for
   kids release variants. Every in-app string keeps Signal's own wording (a "Signal"→"Messenger"
   rewrite was dropped on 2026-11-21 over licensing concerns).
-- **Calls stay off Android's Telecom framework** (`android.calling.useJetPackTelecom.2` forced off).
-  On v0.07, where Signal had Telecom on, every call ended straight away as missed in both directions
-  on the test phone. Molly 8.19 never used Telecom below Android 16.
+- **Calls need the other side on RingRTC 2.70+.** RingRTC 2.75.0 (Signal 8.37) dropped "legacy
+  bidirectional codec support", which Molly 8.19 / our Molly-based builds (RingRTC 2.69.5) still
+  use. Between the two, every call fails during setup and shows as missed on both phones
+  (debug log: `Incoming offer: encode codecs: [], decode codecs: []` → `Unable to munge SDP`).
+  It isn't a bug in this fork: current Signal works, and old Molly-based installs can't be fixed.
 - **Dependency verification is strict** (`gradle/verification-metadata.xml`). Adding an external
   dependency means writing checksums. Prefer code that needs none.
 
@@ -163,7 +168,8 @@ fetched (`GIT_LFS_SKIP_SMUDGE=1`); they aren't needed to build.
       config + one-line hooks). Kept on purpose: the battery-optimization prompt (the websocket
       needs it) and the functional chat-list banners. Remaining invite buttons hit the
       `InviteActions` hook; Signal's invite screen is PIN-gated.
-- [ ] Phase 5: block unknown contacts
+- [x] Phase 5: block unknown contacts (Molly's rule: system contact, profile shared, or shared
+      accepted group), toggle in Parental controls, off by default
 - [ ] Phase 6: UnifiedPush (Molly's `im.molly.unifiedpush`, launcher distributor + MollySocket).
       Add a first-run choice between **WebSocket** and **UnifiedPush**, and never mention Google Play
       (the user's request after testing: today the app "fails over" to websocket with Play wording,
