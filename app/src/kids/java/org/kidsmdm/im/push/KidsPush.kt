@@ -48,7 +48,10 @@ object KidsPush {
     SERVER_ERROR,
 
     /** The account already has the maximum number of linked devices. */
-    DEVICE_LIMIT
+    DEVICE_LIMIT,
+
+    /** The distributor refused the registration. */
+    DISTRIBUTOR_FAILED
   }
 
   fun init(application: Application) {
@@ -74,7 +77,8 @@ object KidsPush {
     if (method == Method.UNIFIEDPUSH) {
       KidsPushState.status = Status.WAITING
     }
-    refresh()
+    // Like Molly's settings screen: a new server registration asks MollySocket for a test push.
+    refresh(testPing = method == Method.UNIFIEDPUSH)
   }
 
   fun refresh(fromNewEndpoint: Boolean = false, testPing: Boolean = false) {

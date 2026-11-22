@@ -95,13 +95,16 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
 - The parent picks **Always connected** (Signal's own websocket, default) or **UnifiedPush** on first
   run (`PushChoiceActivity`, shown once MainActivity opens after registration) and later in Parental
   controls, which also shows the status. No Google Play wording anywhere.
-- No UnifiedPush library: `UnifiedPushClient` sends the spec's broadcasts itself (Android 14 shared
-  broadcast identity, which is what the launcher's distributor checks). `<queries>` in the kids
-  manifest makes the distributor visible. The launcher's distributor must be on ("Push notifications
-  for other apps"); it's preferred over any other distributor.
-- **The launcher hands out a new endpoint on every REGISTER**, so `KidsPushRefreshJob` registers only
-  when there's no endpoint. Re-registering on each start would change the endpoint and lose pushes
-  whenever MollySocket can't be told.
+- **Molly's code, Molly's library.** `org.unifiedpush.android:connector:3.0.10` (Apache-2.0, pulls in
+  Tink + Gson; added for the kids flavor in `kidsmdm-app.gradle.kts` with Molly's exclusions; checksums
+  in `gradle/verification-metadata.xml`). `UnifiedPushReceiver`, `UnifiedPushDistributor` and
+  `KidsPushRefreshJob` are Molly's classes with only Signal/storage adaptations (no SignalStore
+  values, no VAPID, no air-gapped mode, no Molly passphrase lock; the distributor is picked
+  automatically, preferring the Kids MDM launcher). A v0.10 hand-written client lagged and
+  duplicated notifications; don't reinvent this part.
+- The library provides `RaiseToForegroundService`. The launcher (0.58.0+) binds to it for 5 s per
+  push (UnifiedPush AND_3 MUST), which is what lets the fetch service start from the background.
+  Launcher 0.58.0+ also returns the same endpoint when the app re-registers (on every start).
 - `MollySocketClient` (ported from Molly): links a "MollySocket" device with Signal's own
   `registerAsSecondaryDevice` and posts `{uuid, device_id, password, endpoint, ping}` to the server
   (webserver mode only; the Pi serves it at `https://<pi>.<tailnet>.ts.net:8443`). Molly's prekey

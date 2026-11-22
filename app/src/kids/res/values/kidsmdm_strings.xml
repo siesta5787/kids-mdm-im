@@ -39,6 +39,7 @@
     <string name="kidsmdm_push_status__waiting">setting up. The app stays connected until it\'s working.</string>
     <string name="kidsmdm_push_status__server_error">the MollySocket server didn\'t accept the registration. The app stays connected.</string>
     <string name="kidsmdm_push_status__device_limit">the account already has the most linked devices allowed. Remove one in Settings → Linked devices.</string>
+    <string name="kidsmdm_push_status__distributor_failed">the launcher refused the registration. The app stays connected.</string>
     <string name="kidsmdm_push_status__last_push">Last push: %1$s</string>
 
     <string name="parental_pin_gate__enter_parental_pin">Enter parental PIN</string>

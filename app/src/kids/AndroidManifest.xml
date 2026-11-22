@@ -23,13 +23,6 @@
         android:label="Access to Kids MDM IM parental journal"
         android:protectionLevel="signature" />
 
-    <!-- Finding UnifiedPush distributors (the Kids MDM launcher) needs package visibility. -->
-    <queries>
-        <intent>
-            <action android:name="org.unifiedpush.android.distributor.REGISTER" />
-        </intent>
-    </queries>
-
     <application>
         <!-- Runs org.kidsmdm.im.KidsMdm.init at process start (PIN gate, settings row). -->
         <provider
@@ -77,8 +70,9 @@
             android:theme="@style/Signal.DayNight"
             android:windowSoftInputMode="adjustResize" />
 
-        <!-- Broadcasts from the UnifiedPush distributor. Exported because the distributor is another
-             app; every broadcast must carry our secret registration token (org.kidsmdm.im.push). -->
+        <!-- Broadcasts from the UnifiedPush distributor, as in Molly. Declaring it here replaces the
+             connector library's own receiver; the library also adds its <queries> and the
+             RaiseToForegroundService the launcher binds to before delivering a push. -->
         <receiver
             android:name="org.kidsmdm.im.push.UnifiedPushReceiver"
             android:exported="true"

@@ -1,81 +1,102 @@
 /*
- * Kids MDM IM: receives broadcasts from the UnifiedPush distributor.
+ * Kids MDM IM: UnifiedPush receiver (from Molly's im.molly.unifiedpush.receiver.UnifiedPushReceiver, AGPL-3.0).
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
 package org.kidsmdm.im.push
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
+import org.kidsmdm.im.KidsSettings
+import org.signal.core.util.concurrent.SignalExecutors
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.gcm.FcmFetchManager
 import org.thoughtcrime.securesms.keyvalue.SignalStore
+import org.thoughtcrime.securesms.util.concurrent.SerialMonoLifoExecutor
+import org.unifiedpush.android.connector.FailedReason
+import org.unifiedpush.android.connector.MessagingReceiver
+import org.unifiedpush.android.connector.UnifiedPush
+import org.unifiedpush.android.connector.data.PushEndpoint
+import org.unifiedpush.android.connector.data.PushMessage
 
 /**
- * Exported (the distributor is another app), but every broadcast must carry our secret token.
- * A push carries no content: it only means "messages are waiting", and the app fetches them the
- * same way Signal does after an FCM push (FcmFetchManager).
+ * Molly's receiver, minus what Signal doesn't have (Molly's passphrase lock, air-gapped
+ * MollySocket and its alert notifications; our status shows in Parental controls instead).
+ * MollySocket's pushes carry no content: each one starts Signal's fetch, exactly like a
+ * high-priority FCM push (FcmReceiveService.handleReceivedNotification).
  */
-class UnifiedPushReceiver : BroadcastReceiver() {
+class UnifiedPushReceiver : MessagingReceiver() {
+
   companion object {
     private val TAG = Log.tag(UnifiedPushReceiver::class.java)
   }
 
-  override fun onReceive(context: Context, intent: Intent) {
-    val token = intent.getStringExtra(UnifiedPushClient.EXTRA_TOKEN)
-    if (token == null || token != KidsPushState.token) {
-      Log.w(TAG, "Ignoring ${intent.action} with an unknown token")
-      return
+  private val executor = SerialMonoLifoExecutor(SignalExecutors.UNBOUNDED)
+
+  override fun onNewEndpoint(context: Context, endpoint: PushEndpoint, instance: String) {
+    Log.i(TAG, "onNewEndpoint($instance)")
+    refreshEndpoint(endpoint.url)
+  }
+
+  override fun onRegistrationFailed(context: Context, reason: FailedReason, instance: String) {
+    // called when the registration is not possible, eg. no network
+    Log.w(TAG, "onRegistrationFailed($instance): $reason")
+    val wasActive = KidsPush.isPushActive()
+    KidsPushState.status = KidsPush.Status.DISTRIBUTOR_FAILED
+    KidsPush.onPushActiveChanged(wasActive)
+  }
+
+  override fun onUnregistered(context: Context, instance: String) {
+    // called when this application is unregistered from receiving push messages
+    // isPushAvailable becomes false => The websocket starts
+    Log.i(TAG, "onUnregistered($instance)")
+    UnifiedPush.removeDistributor(context)
+    refreshEndpoint(null)
+  }
+
+  override fun onMessage(context: Context, message: PushMessage, instance: String) {
+    val msg = message.content.toString(Charsets.UTF_8)
+    KidsPushState.lastPushAt = System.currentTimeMillis()
+
+    when {
+      msg.contains("\"test\":true") -> {
+        Log.d(TAG, "Test message received.")
+        KidsPush.refresh(fromNewEndpoint = true)
+      }
+
+      else -> {
+        if (SignalStore.account.isRegistered && KidsSettings.pushMethod == KidsPush.Method.UNIFIEDPUSH) {
+          Log.d(TAG, "New message")
+          executor.enqueue { handleReceivedNotification(context) }
+        }
+      }
     }
+  }
 
-    when (intent.action) {
-      UnifiedPushClient.ACTION_NEW_ENDPOINT -> {
-        val endpoint = intent.getStringExtra(UnifiedPushClient.EXTRA_ENDPOINT) ?: return
-        if (endpoint != KidsPushState.endpoint) {
-          Log.i(TAG, "New endpoint")
-          KidsPushState.endpoint = endpoint
-          KidsPush.refresh(fromNewEndpoint = true, testPing = true)
-        }
-      }
+  /** What Signal's (private) FcmReceiveService.handleReceivedNotification does for a high-priority push. */
+  private fun handleReceivedNotification(context: Context) {
+    try {
+      FcmFetchManager.startForegroundService(context)
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to start service.", e)
+    }
+    FcmFetchManager.enqueueFetch(context, true)
+  }
 
-      UnifiedPushClient.ACTION_MESSAGE -> {
-        intent.getStringExtra(UnifiedPushClient.EXTRA_MESSAGE_ID)?.let { id ->
-          KidsPushState.distributor?.let { UnifiedPushClient.acknowledge(context, it, token, id) }
-        }
-        KidsPushState.lastPushAt = System.currentTimeMillis()
-        val text = intent.getByteArrayExtra(UnifiedPushClient.EXTRA_BYTES_MESSAGE)?.toString(Charsets.UTF_8).orEmpty()
-        if (text.contains("\"test\":true")) {
-          Log.i(TAG, "Test push received")
-          return
-        }
-        if (SignalStore.account.isRegistered && KidsPush.isPushActive()) {
-          Log.i(TAG, "Push received; fetching messages")
-          try {
-            FcmFetchManager.startForegroundService(context)
-          } catch (e: Exception) {
-            Log.w(TAG, "Couldn't start the fetch service", e)
-          }
-          FcmFetchManager.enqueueFetch(context, true)
-        }
-      }
-
-      UnifiedPushClient.ACTION_UNREGISTERED -> {
-        Log.w(TAG, "The distributor unregistered us")
-        val wasActive = KidsPush.isPushActive()
-        KidsPushState.endpoint = null
-        KidsPushState.status = KidsPush.Status.WAITING
-        KidsPush.onPushActiveChanged(wasActive)
-        KidsPush.refresh()
-      }
-
-      UnifiedPushClient.ACTION_REGISTRATION_FAILED -> {
-        Log.w(TAG, "The distributor refused the registration")
-        val wasActive = KidsPush.isPushActive()
-        KidsPushState.endpoint = null
-        KidsPushState.status = KidsPush.Status.NO_DISTRIBUTOR
-        KidsPush.onPushActiveChanged(wasActive)
-      }
+  /**
+   * Update UnifiedPush endpoint
+   *
+   * @return `true` if the endpoint has been updated, `false` if the endpoint is the same
+   */
+  private fun refreshEndpoint(endpoint: String?): Boolean {
+    val stored = KidsPushState.endpoint
+    return if (endpoint != stored) {
+      val wasActive = KidsPush.isPushActive()
+      KidsPushState.endpoint = endpoint
+      KidsPush.onPushActiveChanged(wasActive)
+      KidsPush.refresh(fromNewEndpoint = true)
+      true
+    } else {
+      false
     }
   }
 }

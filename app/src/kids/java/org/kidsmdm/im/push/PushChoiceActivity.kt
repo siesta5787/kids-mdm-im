@@ -85,7 +85,7 @@ class PushChoiceActivity : BaseActivity() {
   private fun updateDetails() {
     unifiedPushDetails.visibility = if (unifiedPush.isChecked) View.VISIBLE else View.GONE
     findViewById<View>(R.id.kidsmdm_push_no_distributor).visibility =
-      if (unifiedPush.isChecked && UnifiedPushClient.pickDistributor(this) == null) View.VISIBLE else View.GONE
+      if (unifiedPush.isChecked && !UnifiedPushDistributor.hasDistributor(this)) View.VISIBLE else View.GONE
     error.visibility = View.GONE
   }
 

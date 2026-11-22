@@ -1,5 +1,5 @@
 /*
- * Kids MDM IM: sets up or tears down UnifiedPush (based on Molly's UnifiedPushRefreshJob, AGPL-3.0).
+ * Kids MDM IM: UnifiedPush registration (from Molly's UnifiedPushRefreshJob, AGPL-3.0).
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
@@ -7,7 +7,6 @@ package org.kidsmdm.im.push
 
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.kidsmdm.im.KidsSettings
-import org.signal.core.util.Util
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.jobmanager.Job
 import org.thoughtcrime.securesms.jobmanager.JsonJobData
@@ -18,14 +17,16 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * Brings the UnifiedPush registration in line with [KidsSettings.pushMethod]:
- *  1. register with the distributor (only when there's no endpoint yet: the launcher hands out
- *     a new endpoint on every registration, and an endpoint MollySocket doesn't know loses pushes);
- *  2. make sure MollySocket's linked device exists;
- *  3. register device + endpoint with the MollySocket server.
- * In websocket mode it unregisters and unlinks MollySocket's device instead.
+ * Molly's UnifiedPushRefreshJob: handles UnifiedPush registration and keeps the MollySocket status
+ * up to date; unregisters when the parent picks "Always connected". Differences from Molly:
+ * settings come from [KidsSettings]/[KidsPushState] instead of SignalStore, no VAPID key is
+ * required (we don't scan MollySocket's QR code; the launcher's distributor doesn't use VAPID),
+ * only MollySocket's webserver mode, and status problems show in Parental controls instead of
+ * notifications. Registered in Signal's JobManagerFactories under [KEY] (one-line hook).
  *
- * Registered in Signal's JobManagerFactories under [KEY] (one-line hook).
+ * @param testPing Send a ping notification with the registration.
+ * @param fromNewEndpoint Avoid registration cycle: if the Job is run from the receiver
+ *   "onNewEndpoint", it will not register to the distributor.
  */
 class KidsPushRefreshJob private constructor(
   parameters: Parameters,
@@ -53,6 +54,117 @@ class KidsPushRefreshJob private constructor(
     private const val KEY_TEST_PING = "test_ping"
   }
 
+  public override fun onRun() {
+    if (!SignalStore.account.isRegistered || SignalStore.account.isLinkedDevice) {
+      Log.w(TAG, "User is not registered. Skipping.")
+      return
+    }
+
+    val wasActive = KidsPush.isPushActive()
+
+    if (KidsSettings.pushMethod != KidsPush.Method.UNIFIEDPUSH) {
+      Log.d(TAG, "UnifiedPush is disabled.")
+      try {
+        if (KidsPushState.endpoint != null) UnifiedPushDistributor.unregisterApp()
+        cleanupMollySocketDevice()
+        KidsPushState.clear()
+      } finally {
+        KidsPush.onPushActiveChanged(wasActive)
+      }
+      return
+    }
+
+    val currentStatus = KidsPushState.status
+    Log.d(TAG, "Current registration status: $currentStatus")
+
+    try {
+      validateMollySocketDevice()
+
+      val newStatus = checkRegistrationStatus()
+      if (currentStatus == newStatus) {
+        Log.d(TAG, "Registration status unchanged.")
+      } else {
+        Log.d(TAG, "Updated registration status: $newStatus")
+        KidsPushState.status = newStatus
+      }
+    } catch (t: Throwable) {
+      Log.e(TAG, "Error checking registration status", t)
+
+      if (currentStatus != KidsPush.Status.REGISTERED) {
+        KidsPushState.status = KidsPush.Status.WAITING
+      }
+
+      // Re-throw the exception as IOException for retry
+      when (t) {
+        is IOException -> throw t
+        else -> throw IOException(t)
+      }
+    } finally {
+      KidsPush.onPushActiveChanged(wasActive)
+    }
+  }
+
+  @Throws(IOException::class)
+  private fun checkRegistrationStatus(): KidsPush.Status {
+    val mollySocketUrl = KidsSettings.mollySocketUrl?.toHttpUrlOrNull()
+    Log.d(TAG, "Last notification received at: ${KidsPushState.lastPushAt}")
+
+    if (!fromNewEndpoint) {
+      if (!UnifiedPushDistributor.selectDistributor()) {
+        Log.e(TAG, "No UnifiedPush distributor. Is the launcher's distributor turned on?")
+        return KidsPush.Status.NO_DISTRIBUTOR
+      }
+      UnifiedPushDistributor.registerApp(null)
+    }
+
+    val endpoint = KidsPushState.endpoint
+    if (!UnifiedPushDistributor.checkIfActive() || endpoint == null) {
+      Log.e(TAG, "Distributor is not active or endpoint is missing.")
+      return KidsPush.Status.WAITING
+    }
+
+    if (mollySocketUrl == null) {
+      Log.e(TAG, "Missing MollySocket URL.")
+      return KidsPush.Status.SERVER_ERROR
+    }
+
+    val device = KidsPushState.device ?: try {
+      MollySocketClient.createDevice().also { newDevice ->
+        KidsPushState.device = newDevice
+        Log.d(TAG, "Created new MollySocket device: $newDevice")
+      }
+    } catch (e: MollySocketClient.DeviceLimitException) {
+      Log.e(TAG, "Device limit exceeded.")
+      return KidsPush.Status.DEVICE_LIMIT
+    }
+
+    Log.d(TAG, "Re-registering $device on MollySocket server...")
+    val result = MollySocketClient.register(url = mollySocketUrl, device = device, endpoint = endpoint, ping = testPing)
+    Log.d(TAG, "Registration result: $result")
+
+    return if (result == MollySocketClient.Result.OK) KidsPush.Status.REGISTERED else KidsPush.Status.SERVER_ERROR
+  }
+
+  private fun validateMollySocketDevice() {
+    val device = KidsPushState.device ?: return
+    if (!MollySocketClient.isProbablyLinked(device)) {
+      Log.w(TAG, "$device no longer linked, will be recreated.")
+      KidsPushState.device = null
+    }
+  }
+
+  @Throws(IOException::class)
+  private fun cleanupMollySocketDevice() {
+    val device = KidsPushState.device ?: return
+    Log.d(TAG, "Cleaning up $device...")
+    MollySocketClient.removeDevice(device)
+    KidsPushState.device = null
+  }
+
+  override fun onFailure() = Unit
+
+  override fun onShouldRetry(e: Exception): Boolean = e is IOException
+
   override fun serialize(): ByteArray? {
     return JsonJobData.Builder()
       .putBoolean(KEY_FROM_NEW_ENDPOINT, fromNewEndpoint)
@@ -61,84 +173,6 @@ class KidsPushRefreshJob private constructor(
   }
 
   override fun getFactoryKey(): String = KEY
-
-  override fun onFailure() = Unit
-
-  override fun onShouldRetry(e: Exception): Boolean = e is IOException
-
-  public override fun onRun() {
-    if (!SignalStore.account.isRegistered || SignalStore.account.isLinkedDevice) return
-
-    val wasActive = KidsPush.isPushActive()
-    try {
-      if (KidsSettings.pushMethod == KidsPush.Method.UNIFIEDPUSH) setUp() else tearDown()
-    } finally {
-      KidsPush.onPushActiveChanged(wasActive)
-    }
-  }
-
-  private fun setUp() {
-    val distributor = UnifiedPushClient.pickDistributor(context)
-    if (distributor == null) {
-      Log.w(TAG, "No UnifiedPush distributor. Is the launcher's distributor turned on?")
-      KidsPushState.status = KidsPush.Status.NO_DISTRIBUTOR
-      return
-    }
-
-    if (KidsPushState.token == null || KidsPushState.distributor != distributor) {
-      KidsPushState.token = Util.getSecret(24)
-      KidsPushState.distributor = distributor
-      KidsPushState.endpoint = null
-    }
-
-    val endpoint = KidsPushState.endpoint
-    if (endpoint == null) {
-      if (!fromNewEndpoint) UnifiedPushClient.register(context, distributor, KidsPushState.token!!)
-      if (KidsPushState.status != KidsPush.Status.REGISTERED) KidsPushState.status = KidsPush.Status.WAITING
-      Log.i(TAG, "Waiting for an endpoint from $distributor")
-      return
-    }
-
-    val url = KidsSettings.mollySocketUrl?.toHttpUrlOrNull()
-    if (url == null) {
-      Log.w(TAG, "No MollySocket server address")
-      KidsPushState.status = KidsPush.Status.SERVER_ERROR
-      return
-    }
-
-    var device = KidsPushState.device
-    if (device != null && !MollySocketClient.isProbablyLinked(device)) {
-      Log.w(TAG, "$device is no longer linked; linking a new one.")
-      KidsPushState.device = null
-      device = null
-    }
-    if (device == null) {
-      device = try {
-        MollySocketClient.createDevice()
-      } catch (e: MollySocketClient.DeviceLimitException) {
-        Log.w(TAG, "Device limit reached")
-        KidsPushState.status = KidsPush.Status.DEVICE_LIMIT
-        return
-      }
-      KidsPushState.device = device
-    }
-
-    val result = MollySocketClient.register(url, device, endpoint, ping = testPing)
-    KidsPushState.status = if (result == MollySocketClient.Result.OK) KidsPush.Status.REGISTERED else KidsPush.Status.SERVER_ERROR
-  }
-
-  private fun tearDown() {
-    val token = KidsPushState.token
-    val distributor = KidsPushState.distributor
-    if (token != null && distributor != null) {
-      UnifiedPushClient.unregister(context, distributor, token)
-    }
-    KidsPushState.device?.let { device ->
-      MollySocketClient.removeDevice(device)
-      Log.i(TAG, "Unlinked $device")
-    }
-    KidsPushState.clear()
-  }
 
   class Factory : Job.Factory<KidsPushRefreshJob> {
     override fun create(parameters: Parameters, serializedData: ByteArray?): KidsPushRefreshJob {

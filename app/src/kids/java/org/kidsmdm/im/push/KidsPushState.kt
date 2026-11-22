@@ -17,8 +17,6 @@ import androidx.core.content.edit
 internal object KidsPushState {
   private const val FILE = "kidsmdm_push"
 
-  private const val TOKEN = "up.token"
-  private const val DISTRIBUTOR = "up.distributor"
   private const val ENDPOINT = "up.endpoint"
   private const val STATUS = "up.status"
   private const val LAST_PUSH_AT = "up.last_push_at"
@@ -34,17 +32,7 @@ internal object KidsPushState {
 
   private fun requirePrefs(): SharedPreferences = prefs ?: error("KidsPushState.init was not called")
 
-  /** Our secret registration token with the distributor; every broadcast from it must carry it. */
-  var token: String?
-    get() = prefs?.getString(TOKEN, null)
-    set(value) = requirePrefs().edit { putString(TOKEN, value) }
-
-  /** Package of the distributor we registered with (normally the Kids MDM launcher). */
-  var distributor: String?
-    get() = prefs?.getString(DISTRIBUTOR, null)
-    set(value) = requirePrefs().edit { putString(DISTRIBUTOR, value) }
-
-  /** The push URL the distributor gave us; MollySocket posts to it. */
+  /** The push URL the distributor gave us; MollySocket posts to it. (The connector library keeps the token and distributor.) */
   var endpoint: String?
     get() = prefs?.getString(ENDPOINT, null)
     set(value) = requirePrefs().edit { putString(ENDPOINT, value) }
@@ -72,8 +60,6 @@ internal object KidsPushState {
   /** Forget the registration (keeps nothing that would make the next setup reuse stale values). */
   fun clear() {
     requirePrefs().edit {
-      remove(TOKEN)
-      remove(DISTRIBUTOR)
       remove(ENDPOINT)
       remove(DEVICE_ID)
       remove(DEVICE_PASSWORD)

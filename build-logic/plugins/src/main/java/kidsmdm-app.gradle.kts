@@ -11,6 +11,7 @@
 
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import org.gradle.api.artifacts.ExternalModuleDependency
 
 object KidsMdm {
   const val FLAVOR = "kids"
@@ -33,6 +34,23 @@ object KidsMdm {
    * user agent and RemoteDeprecation parses it strictly as semver.
    */
   const val VERSION_CODE_BASE = 200_000
+
+  /**
+   * UnifiedPush connector (Apache-2.0, pulls in Tink for Web Push decryption), the same library and
+   * version Molly ships, with Molly's exclusions. Used by app/src/kids/java/org/kidsmdm/im/push/.
+   */
+  const val UNIFIEDPUSH_CONNECTOR = "org.unifiedpush.android:connector:3.0.10"
+}
+
+// The kids flavor's own dependencies. The configuration only exists once finalizeDsl has created
+// the flavor, hence the lazy match.
+configurations.matching { it.name == "${KidsMdm.FLAVOR}Implementation" }.configureEach {
+  dependencies.add(
+    (project.dependencies.create(KidsMdm.UNIFIEDPUSH_CONNECTOR) as ExternalModuleDependency).apply {
+      exclude(mapOf("group" to "org.jetbrains.kotlin", "module" to "kotlin-stdlib"))
+      exclude(mapOf("group" to "com.google.protobuf", "module" to "protobuf-java"))
+    }
+  )
 }
 
 val kidsVersion: String? = providers.gradleProperty("kidsVersion").orNull?.removePrefix("v")?.takeIf { it.isNotBlank() }

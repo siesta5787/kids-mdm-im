@@ -73,6 +73,7 @@ class KidsSettingsActivity : BaseActivity() {
       KidsPush.Status.NO_DISTRIBUTOR -> getString(R.string.kidsmdm_push__no_distributor)
       KidsPush.Status.SERVER_ERROR -> getString(R.string.kidsmdm_push_status__server_error)
       KidsPush.Status.DEVICE_LIMIT -> getString(R.string.kidsmdm_push_status__device_limit)
+      KidsPush.Status.DISTRIBUTOR_FAILED -> getString(R.string.kidsmdm_push_status__distributor_failed)
       KidsPush.Status.WAITING, KidsPush.Status.OFF -> getString(R.string.kidsmdm_push_status__waiting)
     }
     val lastPush = KidsPush.lastPushAt
