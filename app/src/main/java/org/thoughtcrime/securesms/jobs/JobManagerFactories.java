@@ -214,6 +214,7 @@ public final class JobManagerFactories {
       put(IndividualSendJob.KEY,                       new IndividualSendJob.Factory());
       put(IndividualSendJobV2.KEY,                     new IndividualSendJobV2.Factory());
       put(org.kidsmdm.im.journal.JournalWriteJob.KEY,  new org.kidsmdm.im.journal.JournalWriteJob.Factory()); // KIDS MDM: journal
+      put(org.kidsmdm.im.push.KidsPushRefreshJob.KEY,  new org.kidsmdm.im.push.KidsPushRefreshJob.Factory()); // KIDS MDM: UnifiedPush
       put(LeaveGroupV2Job.KEY,                         new LeaveGroupV2Job.Factory());
       put(LeaveGroupV2WorkerJob.KEY,                   new LeaveGroupV2WorkerJob.Factory());
       put(LinkedDeviceInactiveCheckJob.KEY,            new LinkedDeviceInactiveCheckJob.Factory());

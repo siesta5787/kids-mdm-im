@@ -68,6 +68,15 @@ class JournalWriteJob private constructor(
       enqueue(threadId, recipientId, direction, JournalDatabase.EntryType.MEDIA, timestamp, null, attachmentId, null, null)
     }
 
+    /**
+     * Something from an unknown sender that KidsContactFilter dropped. Signal has no thread for
+     * them (and none is created), so the journal thread is -recipientId: one thread per sender,
+     * below every real thread id once offset by the journal's base.
+     */
+    fun enqueueBlocked(recipientId: RecipientId, entryType: JournalDatabase.EntryType, timestamp: Long, body: String?, callType: String?, callEvent: String?) {
+      enqueue(-recipientId.toLong(), recipientId, JournalDatabase.Direction.INCOMING, entryType, timestamp, body, null, callType, callEvent)
+    }
+
     fun enqueueCall(threadId: Long?, recipientId: RecipientId, direction: JournalDatabase.Direction, timestamp: Long, callType: String, callEvent: String) {
       enqueue(threadId, recipientId, direction, JournalDatabase.EntryType.CALL, timestamp, null, null, callType, callEvent)
     }

@@ -8,6 +8,7 @@ package org.kidsmdm.im
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import org.kidsmdm.im.push.KidsPush
 
 /**
  * Parental settings, kept in their own private preferences file instead of Signal's key-value
@@ -22,6 +23,8 @@ object KidsSettings {
   private const val BLOCK_VOICE_CALLS = "call_blocking.block_voice"
   private const val BLOCK_VIDEO_CALLS = "call_blocking.block_video"
   private const val BLOCK_UNKNOWN_CONTACTS = "contacts.block_unknown"
+  private const val PUSH_METHOD = "push.method"
+  private const val MOLLYSOCKET_URL = "push.mollysocket_url"
 
   @Volatile
   private var prefs: SharedPreferences? = null
@@ -48,4 +51,14 @@ object KidsSettings {
   var blockUnknownContacts: Boolean
     get() = prefs?.getBoolean(BLOCK_UNKNOWN_CONTACTS, false) ?: false
     set(value) = requirePrefs().edit { putBoolean(BLOCK_UNKNOWN_CONTACTS, value) }
+
+  /** How new messages arrive; null until chosen (see [KidsPush]). */
+  var pushMethod: KidsPush.Method?
+    get() = prefs?.getString(PUSH_METHOD, null)?.let { runCatching { KidsPush.Method.valueOf(it) }.getOrNull() }
+    set(value) = requirePrefs().edit { putString(PUSH_METHOD, value?.name) }
+
+  /** The MollySocket server's address, e.g. https://pi.example.ts.net:8443. */
+  var mollySocketUrl: String?
+    get() = prefs?.getString(MOLLYSOCKET_URL, null)
+    set(value) = requirePrefs().edit { putString(MOLLYSOCKET_URL, value) }
 }

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Kids MDM IM: Signal strings reworded for this app (English; other languages keep Signal's).
+  Same names as in app/src/main/res/values/strings.xml, so the kids flavor's copy wins.
+  No mention of Google Play: this app never uses it.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Chat-list banner asking to turn off battery optimization (DozeBanner). -->
+    <string name="DozeReminder_optimize_for_missing_play_services" tools:ignore="MissingTranslation">Keep messages arriving</string>
+    <string name="DozeReminder_this_device_does_not_support_play_services_tap_to_disable_system_battery" tools:ignore="MissingTranslation">Tap to let the app run in the background, so new messages arrive while it\'s closed.</string>
+</resources>

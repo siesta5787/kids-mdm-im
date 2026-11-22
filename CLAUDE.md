@@ -53,6 +53,8 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
 | `conversation/v2/DisabledInputView.kt` | one line: no invite button on non-Signal contacts |
 | `main/MainToolbar.kt` | one line: no Donate item in the chats/calls/stories menu (`KidsPolicy.DONATIONS_ENABLED`) |
 | `messages/MessageContentProcessor.kt` | one line at the top of `shouldIgnore`: drop content from unknown senders (`KidsContactFilter`) |
+| `keyvalue/SettingsValues.kt` | one line in `shouldStayConnectedInBackground`: a working UnifiedPush counts as push, like FCM (`KidsPush.isPushActive`) |
+| `jobs/JobManagerFactories.java` (again) | one line: register `KidsPushRefreshJob` |
 | `.github/workflows/*` (Signal's) | deleted: they'd retarget our PRs to release branches, run a stale bot, etc. The sync job auto-resolves Signal edits to them by keeping the deletion. |
 
 ## Where our code lives
@@ -77,11 +79,37 @@ touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*
   - `KidsCallBlocking`, `KidsPolicy` (feature switches: location, invites, megaphones, prompts,
     hidden settings rows, attachment buttons), `KidsForcedConfig` (forced remote config: GIF search,
     payments kill switch, call-quality survey, backup megaphones), `KidsContactFilter` (block
-    unknown contacts).
+    unknown contacts; dropped messages/calls are journaled in a per-sender thread `base - recipientId`,
+    messages as MESSAGE entries prefixed "🚫 Blocked (unknown contact): ", calls as
+    `MISSED_CALL_BLOCKING`, so kid-phone-server shows them without changes).
+  - `push/`: message delivery, see "Push" below.
+  - `res/values/kidsmdm_signal_overrides.xml`: Signal strings reworded by name (the battery
+    banner said "This device does not support Play Services").
 - `kidsmdm/hooks` (`:kidsmdm-hooks`): hook points for Signal's *library* modules, which can't see
   app code. `kidsmdm/settings.gradle.kts` adds the dependency to those modules, so their build files
   stay untouched.
 - `kidsmdm/stubs`: FOSS stand-ins for Google libraries (see its README).
+
+## Push (UnifiedPush via the launcher + MollySocket)
+
+- The parent picks **Always connected** (Signal's own websocket, default) or **UnifiedPush** on first
+  run (`PushChoiceActivity`, shown once MainActivity opens after registration) and later in Parental
+  controls, which also shows the status. No Google Play wording anywhere.
+- No UnifiedPush library: `UnifiedPushClient` sends the spec's broadcasts itself (Android 14 shared
+  broadcast identity, which is what the launcher's distributor checks). `<queries>` in the kids
+  manifest makes the distributor visible. The launcher's distributor must be on ("Push notifications
+  for other apps"); it's preferred over any other distributor.
+- **The launcher hands out a new endpoint on every REGISTER**, so `KidsPushRefreshJob` registers only
+  when there's no endpoint. Re-registering on each start would change the endpoint and lose pushes
+  whenever MollySocket can't be told.
+- `MollySocketClient` (ported from Molly): links a "MollySocket" device with Signal's own
+  `registerAsSecondaryDevice` and posts `{uuid, device_id, password, endpoint, ping}` to the server
+  (webserver mode only; the Pi serves it at `https://<pi>.<tailnet>.ts.net:8443`). Molly's prekey
+  workaround isn't needed: Signal now skips sending to own devices without a session.
+- A push carries no content: `UnifiedPushReceiver` starts Signal's `FcmFetchManager` like an FCM push.
+- **Until UnifiedPush works (`Status.REGISTERED` with an endpoint), the websocket stays on.**
+  `KidsPush.onPushActiveChanged` restarts the network when that flips, like Signal's own "stay
+  connected" setting. State is in its own prefs file (`kidsmdm_push`), not SignalStore.
 
 ## Build details
 
@@ -170,8 +198,7 @@ fetched (`GIT_LFS_SKIP_SMUDGE=1`); they aren't needed to build.
       `InviteActions` hook; Signal's invite screen is PIN-gated.
 - [x] Phase 5: block unknown contacts (Molly's rule: system contact, profile shared, or shared
       accepted group), toggle in Parental controls, off by default
-- [ ] Phase 6: UnifiedPush (Molly's `im.molly.unifiedpush`, launcher distributor + MollySocket).
-      Add a first-run choice between **WebSocket** and **UnifiedPush**, and never mention Google Play
-      (the user's request after testing: today the app "fails over" to websocket with Play wording,
-      which is confusing when Play will never be used).
+- [x] Phase 6: UnifiedPush (launcher distributor + MollySocket) with a first-run choice between
+      Always connected and UnifiedPush, no Google Play wording; journal messages/calls blocked by
+      "Block unknown contacts"
 - [ ] Phase 7: cutover (uninstall/reinstall phones: Molly's on-device data isn't readable)

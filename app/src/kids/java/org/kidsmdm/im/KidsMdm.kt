@@ -6,11 +6,14 @@
 package org.kidsmdm.im
 
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import org.kidsmdm.hooks.KidsHooks
 import org.kidsmdm.im.pin.KidsPinGate
+import org.kidsmdm.im.push.KidsPush
 import org.kidsmdm.im.settings.KidsSettingsActivity
 import org.signal.core.ui.compose.Rows
 import org.thoughtcrime.securesms.R
@@ -23,6 +26,9 @@ object KidsMdm {
   fun init(application: Application) {
     KidsSettings.init(application)
     KidsPinGate.install(application)
+    KidsPush.init(application)
+    // Runs after Signal's Application.onCreate (same main-thread message), once its dependencies exist.
+    Handler(Looper.getMainLooper()).post { KidsPush.onAppStarted() }
     KidsHooks.forcedRemoteConfig = KidsForcedConfig.VALUES
     KidsHooks.hiddenAppSettingsRows = KidsPolicy.HIDDEN_APP_SETTINGS_ROWS
 

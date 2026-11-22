@@ -5,16 +5,19 @@
 
 package org.kidsmdm.im
 
+import org.kidsmdm.im.journal.KidsJournal
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.database.SignalDatabase
 import org.thoughtcrime.securesms.messages.SignalServiceProtoUtil.hasSignedGroupChange
 import org.thoughtcrime.securesms.recipients.Recipient
+import org.whispersystems.signalservice.internal.push.CallMessage
 import org.whispersystems.signalservice.internal.push.Content
 
 /**
  * When [KidsSettings.blockUnknownContacts] is on, everything from a sender the kid doesn't know is
  * dropped before Signal stores it: messages, media, calls, stories, typing indicators. No message
- * request, notification or journal entry is created.
+ * request or notification is created. Dropped messages and calls are journaled for the parent
+ * (in a thread of their own per sender, see [KidsJournal.onUnknownContactBlocked]).
  *
  * A sender is known if any of these is true (Molly's rule):
  *  - they're in the phone's contacts,
@@ -39,7 +42,21 @@ object KidsContactFilter {
     if (isKnown(sender)) return false
 
     Log.i(TAG, "Dropped content from an unknown sender (blocking unknown contacts is on).")
+    journal(content, sender)
     return true
+  }
+
+  private fun journal(content: Content, sender: Recipient) {
+    val offer = content.callMessage?.offer
+    if (offer != null) {
+      KidsJournal.onUnknownContactCallBlocked(sender.id, System.currentTimeMillis(), offer.type == CallMessage.Offer.Type.OFFER_VIDEO_CALL)
+      return
+    }
+
+    val message = content.dataMessage ?: return
+    val attachments = message.attachments.size + (if (message.sticker != null) 1 else 0)
+    if (message.body.isNullOrEmpty() && attachments == 0) return // reactions, receipts, profile key updates...
+    KidsJournal.onUnknownContactMessageBlocked(sender.id, message.timestamp ?: System.currentTimeMillis(), message.body, attachments)
   }
 
   private fun isKnown(sender: Recipient): Boolean {

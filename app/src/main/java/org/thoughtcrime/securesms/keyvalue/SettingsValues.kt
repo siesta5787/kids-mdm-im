@@ -472,7 +472,7 @@ class SettingsValues internal constructor(store: KeyValueStore, private val cont
     }
 
   /** Whether the websocket should be kept open while the app is in the background. */
-  fun shouldStayConnectedInBackground(): Boolean = forceWebsocketMode.shouldStayConnected(SignalStore.account.fcmEnabled)
+  fun shouldStayConnectedInBackground(): Boolean = forceWebsocketMode.shouldStayConnected(SignalStore.account.fcmEnabled || org.kidsmdm.im.push.KidsPush.isPushActive()) // KIDS MDM: UnifiedPush counts as push
 
   var mediaKeyboardMode: MediaKeyboardMode
     get() = MediaKeyboardMode.valueOf(getNonNullString(MEDIA_KEYBOARD_MODE, MediaKeyboardMode.EMOJI.name))

@@ -23,6 +23,13 @@
         android:label="Access to Kids MDM IM parental journal"
         android:protectionLevel="signature" />
 
+    <!-- Finding UnifiedPush distributors (the Kids MDM launcher) needs package visibility. -->
+    <queries>
+        <intent>
+            <action android:name="org.unifiedpush.android.distributor.REGISTER" />
+        </intent>
+    </queries>
+
     <application>
         <!-- Runs org.kidsmdm.im.KidsMdm.init at process start (PIN gate, settings row). -->
         <provider
@@ -61,6 +68,28 @@
             android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
             android:exported="false"
             android:theme="@style/Signal.DayNight" />
+
+        <activity
+            android:name="org.kidsmdm.im.push.PushChoiceActivity"
+            android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Signal.DayNight"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Broadcasts from the UnifiedPush distributor. Exported because the distributor is another
+             app; every broadcast must carry our secret registration token (org.kidsmdm.im.push). -->
+        <receiver
+            android:name="org.kidsmdm.im.push.UnifiedPushReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="org.unifiedpush.android.connector.NEW_ENDPOINT" />
+                <action android:name="org.unifiedpush.android.connector.MESSAGE" />
+                <action android:name="org.unifiedpush.android.connector.UNREGISTERED" />
+                <action android:name="org.unifiedpush.android.connector.REGISTRATION_FAILED" />
+            </intent-filter>
+        </receiver>
 
         <!-- No Google libraries ship (kidsmdm/settings.gradle.kts), so drop Signal's Google meta-data:
              the Maps API key, the Google Pay flag and the Play services version. -->

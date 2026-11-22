@@ -13,6 +13,33 @@
     <string name="kidsmdm_settings__block_voice_calls">Block voice calls</string>
     <string name="kidsmdm_settings__block_video_calls">Block video calls</string>
     <string name="kidsmdm_settings__pin">Parental PIN</string>
+    <string name="kidsmdm_settings__notifications">Message delivery</string>
+    <string name="kidsmdm_settings__change_delivery">Change</string>
+
+    <string name="kidsmdm_push__title">How should new messages arrive?</string>
+    <string name="kidsmdm_push__intro">You can change this later in Parental controls.</string>
+    <string name="kidsmdm_push__websocket">Always connected (recommended)</string>
+    <string name="kidsmdm_push__websocket_summary">The app keeps its own connection open, with a small ongoing notification. Works on any network. Uses a little more battery.</string>
+    <string name="kidsmdm_push__unifiedpush">UnifiedPush</string>
+    <string name="kidsmdm_push__unifiedpush_summary">Your MollySocket server wakes the app through the Kids MDM launcher when a message arrives. Saves battery. Until it\'s working, the app stays connected.</string>
+    <string name="kidsmdm_push__mollysocket_address">MollySocket server address</string>
+    <string name="kidsmdm_push__mollysocket_address_hint">For example https://your-pi.your-tailnet.ts.net:8443</string>
+    <string name="kidsmdm_push__no_distributor">Turn on \"Push notifications for other apps\" in the Kids MDM launcher\'s settings first.</string>
+    <string name="kidsmdm_push__save">Continue</string>
+    <string name="kidsmdm_push__checking">Checking server…</string>
+    <string name="kidsmdm_push__setting_up">Setting up UnifiedPush. Check its status in Parental controls.</string>
+    <string name="kidsmdm_push__error_address">Enter the server\'s https address.</string>
+    <string name="kidsmdm_push__error_not_mollysocket">That address answered, but it isn\'t a MollySocket server.</string>
+    <string name="kidsmdm_push__error_unreachable">Couldn\'t reach that address from this phone.</string>
+
+    <string name="kidsmdm_push_status__not_chosen">Not chosen yet. The app stays connected.</string>
+    <string name="kidsmdm_push_status__websocket">Always connected</string>
+    <string name="kidsmdm_push_status__unifiedpush">UnifiedPush: %1$s</string>
+    <string name="kidsmdm_push_status__working">working</string>
+    <string name="kidsmdm_push_status__waiting">setting up. The app stays connected until it\'s working.</string>
+    <string name="kidsmdm_push_status__server_error">the MollySocket server didn\'t accept the registration. The app stays connected.</string>
+    <string name="kidsmdm_push_status__device_limit">the account already has the most linked devices allowed. Remove one in Settings → Linked devices.</string>
+    <string name="kidsmdm_push_status__last_push">Last push: %1$s</string>
 
     <string name="parental_pin_gate__enter_parental_pin">Enter parental PIN</string>
     <string name="parental_pin_gate__unlock">Unlock</string>

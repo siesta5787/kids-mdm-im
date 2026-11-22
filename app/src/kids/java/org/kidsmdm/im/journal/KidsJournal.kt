@@ -66,6 +66,32 @@ object KidsJournal {
     JournalWriteJob.enqueueCall(null, peer, JournalDatabase.Direction.INCOMING, timestamp, if (isVideo) "VIDEO_CALL" else "AUDIO_CALL", CALL_EVENT_BLOCKED)
   }
 
+  /**
+   * A message dropped by "Block unknown contacts" (KidsContactFilter). Stored as a MESSAGE entry so
+   * kid-phone-server shows it as is, with a prefix saying it was blocked. Attachments are never
+   * downloaded from unknown senders, so only their count is noted.
+   */
+  @JvmStatic
+  fun onUnknownContactMessageBlocked(sender: RecipientId, timestamp: Long, body: String?, attachmentCount: Int) {
+    val text = buildString {
+      append(BLOCKED_PREFIX)
+      if (!body.isNullOrEmpty()) append(body)
+      if (attachmentCount > 0) {
+        if (!body.isNullOrEmpty()) append(' ')
+        append(if (attachmentCount == 1) "[1 attachment, not downloaded]" else "[$attachmentCount attachments, not downloaded]")
+      }
+    }
+    JournalWriteJob.enqueueBlocked(sender, JournalDatabase.EntryType.MESSAGE, timestamp, text, null, null)
+  }
+
+  /** A call dropped by "Block unknown contacts"; shown like other blocked calls. */
+  @JvmStatic
+  fun onUnknownContactCallBlocked(sender: RecipientId, timestamp: Long, isVideo: Boolean) {
+    JournalWriteJob.enqueueBlocked(sender, JournalDatabase.EntryType.CALL, timestamp, null, if (isVideo) "VIDEO_CALL" else "AUDIO_CALL", CALL_EVENT_BLOCKED)
+  }
+
+  private const val BLOCKED_PREFIX = "\uD83D\uDEAB Blocked (unknown contact): "
+
   /** Same event name the Molly-based builds used, so kid-phone-server shows it the same way. */
   const val CALL_EVENT_BLOCKED = "MISSED_CALL_BLOCKING"
 
