@@ -1,9 +1,11 @@
 # Kids MDM IM: project notes
 
 A downstream fork of [Signal-Android](https://github.com/signalapp/Signal-Android), hardened as a
-monitored messenger for a child's phone. It used to be based on Molly. It was rebased directly onto
-Signal on 2026-11-20 because Molly had stalled at Signal 8.19.2. The Molly-era code is kept on the
-`legacy-molly` branch after cutover; until then it's still on `main`, and this work lives on `next`.
+monitored messenger for a child's phone. **It's no longer a Molly fork.**
+- Up to v0.06 it was based on Molly.
+- It was rebased directly onto Signal on 2026-11-20, because Molly had stalled at Signal 8.19.2.
+- At cutover on 2026-11-22, `next` became `main`, and the Molly-era code is archived on `legacy-molly`.
+- A few features are ported from Molly (UnifiedPush/MollySocket, "block unknown contacts"); see below.
 
 Pairs with [kid-phone-server](https://github.com/siesta5787/kid-phone-server) and
 [kids-launcher-mdm](https://github.com/siesta5787/kids-launcher-mdm).
@@ -26,7 +28,7 @@ fast-forward `main`). That only works while our changes rarely conflict. In orde
 3. **One-line hooks** in Signal files, only at real choke points, each marked `// KIDS MDM:`.
 
 Never edit Signal's strings, `verification-metadata.xml`, or reformat Signal code. Keep the list of
-touched Signal files short: `git diff --stat signal-stable next -- . ':!**/kids*' ':!.github'`.
+touched Signal files short: `git diff --stat signal-stable main -- . ':!**/kids*' ':!.github'`.
 
 ### Signal files we touch (keep this list current)
 
@@ -162,19 +164,17 @@ for review if its package, signing key or permissions change, or its versionCode
 
 | Workflow | What |
 |---|---|
-| `kids-test.yml` | PRs + pushes to `main`/`next`: `kidsmdm/scripts/check-no-google.sh` (fails if any Google artifact would ship) + `assembleKidsProdDebug` + `testKidsProdDebugUnitTest` + `processKidsProdReleaseResources` (checks the release-only label overlay merges) |
-| `kids-test-apk.yml` | pushes to `next`: signed release APK as a workflow **artifact** (not a release) for side-loading. versionCode 200000. |
+| `kids-test.yml` | PRs + pushes to `main` (and a `next` staging branch, if one is ever used again): `kidsmdm/scripts/check-no-google.sh` (fails if any Google artifact would ship) + `assembleKidsProdDebug` + `testKidsProdDebugUnitTest` + `processKidsProdReleaseResources` (checks the release-only label overlay merges) |
+| `kids-test-apk.yml` | pushes to a `next` staging branch (none since cutover): signed release APK as a workflow **artifact** (not a release) for side-loading. versionCode 200000. |
 | `kids-build-apk.yml` | reusable: builds one signed `kidsProdRelease` APK |
 | `kids-tagrelease.yml` | `gh workflow run kids-tagrelease.yml -R siesta5787/kids-mdm-im [-f version=X.YY]`: tags `main` (default: next version after the highest `vX.YY`), then calls release |
 | `kids-release.yml` | runs on a pushed `vX.YY` tag (from any branch: `git tag v0.07 <commit> && git push origin v0.07`) or when called; builds the tag, checks its versionCode beats every other release, publishes `KidsMDMIM-vX.YY.apk` as a **beta prerelease** |
 | `kids-promote.yml` | `gh workflow run kids-promote.yml -R siesta5787/kids-mdm-im -f version=X.YY`: beta → stable |
 | `kids-sync.yml` | twice daily: Signal stable (from `updates.signal.org/android/latest.json`) → `sync/signal-vX` → test → fast-forward `main` → automatic beta release; opens an issue on conflict or failure; mirrors the release to `signal-stable` |
 
-`workflow_dispatch` and `schedule` only work for workflows on the default branch. Until cutover
-makes this branch `main`, tagrelease, promote and sync can't be started. A beta can still be
-published by pushing a `vX.YY` tag on `next` by hand, which triggers `kids-release`.
-**Before cutover, the kids' "Kids MDM IM" server entry must keep "Include prereleases" off**, or a
-beta would replace the Molly-based app on their phones.
+`workflow_dispatch` and `schedule` only work for workflows on the default branch, which is `main`
+since cutover. (Before that, betas were cut by pushing a `vX.YY` tag by hand, and v0.09/v0.11 were
+promoted with `gh release edit` instead of `kids-promote.yml`.)
 
 Secrets: `SECRET_KEYSTORE` (base64 PKCS12), `SECRET_KEYSTORE_ALIAS=kidsmdm`,
 `SECRET_KEYSTORE_PASSWORD` (shared Kids MDM release key, cert SHA-256
@@ -182,8 +182,9 @@ Secrets: `SECRET_KEYSTORE` (base64 PKCS12), `SECRET_KEYSTORE_ALIAS=kidsmdm`,
 `SYNC_PAT`. `SYNC_PAT` is a fine-grained token with Contents + Workflows read/write; GitHub refuses
 `GITHUB_TOKEN` pushes whose commits touch `.github/workflows`, which Signal's history does.
 
-The GitHub repo is a *fork of mollyim/mollyim-android*, so always pass `-R siesta5787/kids-mdm-im`
-to `gh pr create` or it targets Molly. Signal's screenshot-test PNGs are Git LFS and are never
+GitHub still lists the repo as a *fork of mollyim/mollyim-android* until the owner detaches it,
+because GitHub has no API for that: use Settings → Danger zone, or ask GitHub Support. Until then,
+always pass `-R siesta5787/kids-mdm-im` to `gh pr create`, or it targets Molly. Signal's screenshot-test PNGs are Git LFS and are never
 fetched (`GIT_LFS_SKIP_SMUDGE=1`); they aren't needed to build.
 
 ## Rebase status (see the plan in the Kids MDM memory / chat of 2026-11-20)
@@ -204,4 +205,10 @@ fetched (`GIT_LFS_SKIP_SMUDGE=1`); they aren't needed to build.
 - [x] Phase 6: UnifiedPush (launcher distributor + MollySocket) with a first-run choice between
       Always connected and UnifiedPush, no Google Play wording; journal messages/calls blocked by
       "Block unknown contacts"
-- [ ] Phase 7: cutover (uninstall/reinstall phones: Molly's on-device data isn't readable)
+- [x] Phase 7: cutover (2026-11-22).
+      - Branches: `main` (Molly) → `legacy-molly`; `next` → `main`, now the default branch.
+      - Releases: v0.11 promoted to stable; the twice-daily Signal sync and the dispatch workflows now run.
+      - Phones: replacing a Molly-based install means uninstalling and reinstalling, because Molly's
+        on-device data isn't readable. Re-register the account, then pick the delivery method.
+      - Leftover Molly-era branches (`molly-upstream`, `upstream-main`, `signal-8.20.4`,
+        `feature-access`, `fix/socks-proxy-dns-leak`, `flatline-dev-build`) can be deleted at any time.
