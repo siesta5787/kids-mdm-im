@@ -208,7 +208,11 @@ public class ApplicationContext extends Application implements AppForegroundObse
               .addBlocking("first-launch", this::initializeFirstEverAppLaunch)
               .addBlocking("app-migrations", this::initializeApplicationMigrations)
               .addBlocking("lifecycle-observer", () -> AppForegroundObserver.addListener(this))
-              .addBlocking("assistant-screen-security", () -> registerOnProvideAssistDataListener(new AssistantScreenSecurityObserver()))
+              .addBlocking("assistant-screen-security", () -> {
+                AssistantScreenSecurityObserver observer = new AssistantScreenSecurityObserver();
+                registerOnProvideAssistDataListener(observer);
+                registerActivityLifecycleCallbacks(observer);
+              })
               .addBlocking("message-retriever", this::initializeMessageRetrieval)
               .addBlocking("dynamic-theme", () -> DynamicTheme.setDefaultDayNightMode(this))
               .addBlocking("proxy-init", () -> {
@@ -585,6 +589,10 @@ public class ApplicationContext extends Application implements AppForegroundObse
       Map<String, String> fieldTrials = new HashMap<>();
       if (RemoteConfig.callingFieldTrialAnyAddressPortsKillSwitch()) {
         fieldTrials.put("RingRTC-AnyAddressPortsKillSwitch", "Enabled");
+      }
+      String smartFlushing = RemoteConfig.callingFieldTrialSmartFlushing();
+      if (!smartFlushing.isEmpty()) {
+        fieldTrials.put("WebRTC-Audio-NetEqSmartFlushing", smartFlushing);
       }
       CallManager.initialize(this, new RingRtcLogger(), fieldTrials);
     } catch (UnsatisfiedLinkError e) {

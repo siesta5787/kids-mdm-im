@@ -1014,6 +1014,15 @@ object RemoteConfig {
     hotSwappable = false
   )
 
+  /** Value for the WebRTC field trial "WebRTC-Audio-NetEqSmartFlushing" */
+  @JvmStatic
+  @get:JvmName("callingFieldTrialSmartFlushing")
+  val callingFieldTrialSmartFlushing: String by remoteString(
+    key = "android.calling.fieldTrial.smartFlushing",
+    defaultValue = "",
+    hotSwappable = false
+  )
+
   /**
    * Enable/disable for notification when we cannot fetch messages despite receiving an urgent push.
    */
@@ -1642,7 +1651,7 @@ object RemoteConfig {
 
   /** Whether to automatically turn on screen security when an assistant app requests the contents of the screen. */
   val automaticScreenSecurity: Boolean by remoteBoolean(
-    key = "android.automaticScreenSecurity.2",
+    key = "android.automaticScreenSecurity.3",
     defaultValue = false,
     hotSwappable = true
   )
