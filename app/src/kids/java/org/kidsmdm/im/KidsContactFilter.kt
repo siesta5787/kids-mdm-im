@@ -1,5 +1,5 @@
 /*
- * Kids MDM IM: block messages and calls from unknown senders.
+ * Kids MDM IM: drop incoming content that isn't from approved people.
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
@@ -7,25 +7,21 @@ package org.kidsmdm.im
 
 import org.kidsmdm.im.journal.KidsJournal
 import org.signal.core.util.logging.Log
-import org.thoughtcrime.securesms.database.SignalDatabase
-import org.thoughtcrime.securesms.messages.SignalServiceProtoUtil.hasSignedGroupChange
+import org.thoughtcrime.securesms.groups.GroupId
+import org.thoughtcrime.securesms.messages.SignalServiceProtoUtil.isGroupV2Update
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.whispersystems.signalservice.internal.push.CallMessage
 import org.whispersystems.signalservice.internal.push.Content
 
 /**
- * When [KidsSettings.blockUnknownContacts] is on, everything from a sender the kid doesn't know is
- * dropped before Signal stores it: messages, media, calls, stories, typing indicators. No message
- * request or notification is created. Dropped messages and calls are journaled for the parent
- * (in a thread of their own per sender, see [KidsJournal.onUnknownContactBlocked]).
+ * When "Only approved contacts" is on ([KidsApprovedContacts]), content is dropped before Signal
+ * stores it unless the sender is approved and, in a group, every member is: messages, media,
+ * calls, stories, typing indicators. No message request, notification or delivery receipt is
+ * created. Dropped messages and calls are journaled for the parent, in a thread of their own per
+ * sender (see [KidsJournal.onBlockedContactMessage]).
  *
- * A sender is known if any of these is true (Molly's rule):
- *  - they're in the phone's contacts,
- *  - the kid shares their profile with them (accepted their message request or messaged them first),
- *  - they're in a group the kid has accepted.
- *
- * Group changes from unknown senders still apply in groups the kid is already in (members added
- * or removed, the kid being removed), but an unknown sender can't add the kid to a new group.
+ * Group changes always apply in groups the kid is in, so the member list stays current. An approved
+ * person can add the kid to a new group; it stays closed unless everyone in it is approved.
  */
 object KidsContactFilter {
   private val TAG = Log.tag(KidsContactFilter::class.java)
@@ -33,40 +29,35 @@ object KidsContactFilter {
   /** Hook: MessageContentProcessor.shouldIgnore. True to drop this content. */
   @JvmStatic
   fun shouldIgnore(content: Content, sender: Recipient, thread: Recipient): Boolean {
-    if (!KidsSettings.blockUnknownContacts) return false
+    if (!KidsApprovedContacts.enabled) return false
     if (sender.isSelf || sender.isReleaseNotes) return false
 
     val dataMessage = content.dataMessage ?: content.editMessage?.dataMessage
-    if (dataMessage?.hasSignedGroupChange == true && thread.isGroup && thread.isActiveGroup) return false
+    if (dataMessage?.isGroupV2Update == true && thread.isGroup && thread.isActiveGroup) return false
 
-    if (isKnown(sender)) return false
+    val typingGroup = content.typingMessage?.groupId?.let { runCatching { Recipient.externalPossiblyMigratedGroup(GroupId.push(it)) }.getOrNull() }
+    val group = typingGroup ?: thread.takeIf { it.isGroup }
 
-    Log.i(TAG, "Dropped content from an unknown sender (blocking unknown contacts is on).")
-    journal(content, sender)
+    val senderApproved = KidsApprovedContacts.isPersonApproved(sender)
+    // A group the kid isn't in yet has no known members; its messages are checked once it does.
+    val groupAllowed = group == null || !group.isActiveGroup || KidsApprovedContacts.isConversationAllowed(group)
+    if (senderApproved && groupAllowed) return false
+
+    Log.i(TAG, "Dropped content (sender approved: $senderApproved, group allowed: $groupAllowed).")
+    journal(content, sender, group?.takeIf { !groupAllowed })
     return true
   }
 
-  private fun journal(content: Content, sender: Recipient) {
+  private fun journal(content: Content, sender: Recipient, closedGroup: Recipient?) {
     val offer = content.callMessage?.offer
     if (offer != null) {
-      KidsJournal.onUnknownContactCallBlocked(sender.id, System.currentTimeMillis(), offer.type == CallMessage.Offer.Type.OFFER_VIDEO_CALL)
+      KidsJournal.onBlockedContactCall(sender.id, System.currentTimeMillis(), offer.type == CallMessage.Offer.Type.OFFER_VIDEO_CALL)
       return
     }
 
     val message = content.dataMessage ?: return
     val attachments = message.attachments.size + (if (message.sticker != null) 1 else 0)
     if (message.body.isNullOrEmpty() && attachments == 0) return // reactions, receipts, profile key updates...
-    KidsJournal.onUnknownContactMessageBlocked(sender.id, message.timestamp ?: System.currentTimeMillis(), message.body, attachments)
-  }
-
-  private fun isKnown(sender: Recipient): Boolean {
-    return sender.isSystemContact || sender.isProfileSharing || isProfileSharedViaGroup(sender)
-  }
-
-  /** Same check as Signal's private RecipientUtil.isProfileSharedViaGroup. */
-  private fun isProfileSharedViaGroup(sender: Recipient): Boolean {
-    return SignalDatabase.groups.getPushGroupsContainingMember(sender.id).any { group ->
-      Recipient.resolved(group.recipientId).isProfileSharing
-    }
+    KidsJournal.onBlockedContactMessage(sender.id, closedGroup?.id, message.timestamp ?: System.currentTimeMillis(), message.body, attachments)
   }
 }

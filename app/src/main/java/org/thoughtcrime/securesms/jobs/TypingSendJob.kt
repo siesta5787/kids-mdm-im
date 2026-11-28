@@ -93,6 +93,8 @@ class TypingSendJob private constructor(
       return Result.success()
     }
 
+    if (org.kidsmdm.im.KidsApprovedContacts.isBlocked(recipient.id)) return Result.success() // KIDS MDM: approved contacts
+
     if (recipient.isSelf) {
       Log.w(TAG, "Not sending typing indicators to self.")
       return Result.success()

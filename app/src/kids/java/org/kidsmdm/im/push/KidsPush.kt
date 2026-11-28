@@ -8,6 +8,7 @@ package org.kidsmdm.im.push
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import org.kidsmdm.im.KidsDefaults
 import org.kidsmdm.im.KidsSettings
 import org.signal.core.util.concurrent.SignalExecutors
 import org.signal.core.util.logging.Log
@@ -116,7 +117,9 @@ object KidsPush {
     private var shownThisProcess = false
 
     override fun onActivityResumed(activity: Activity) {
-      if (shownThisProcess || activity.javaClass.name != MAIN_ACTIVITY) return
+      if (activity.javaClass.name != MAIN_ACTIVITY) return
+      KidsDefaults.applyOnce()
+      if (shownThisProcess) return
       if (KidsSettings.pushMethod != null || !SignalStore.account.isRegistered) return
       shownThisProcess = true
       activity.startActivity(PushChoiceActivity.intent(activity, firstRun = true))

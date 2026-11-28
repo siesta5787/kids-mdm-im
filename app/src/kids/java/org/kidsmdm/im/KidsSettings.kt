@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import org.kidsmdm.im.push.KidsPush
+import org.signal.core.models.recipients.RecipientId
 
 /**
  * Parental settings, kept in their own private preferences file instead of Signal's key-value
@@ -22,7 +23,9 @@ object KidsSettings {
   private const val PIN_HASH = "parental_pin.hash"
   private const val BLOCK_VOICE_CALLS = "call_blocking.block_voice"
   private const val BLOCK_VIDEO_CALLS = "call_blocking.block_video"
-  private const val BLOCK_UNKNOWN_CONTACTS = "contacts.block_unknown"
+  private const val APPROVED_CONTACTS_ONLY = "contacts.approved_only"
+  private const val APPROVED_CONTACTS = "contacts.approved"
+  private const val STORIES_DEFAULT_APPLIED = "defaults.stories_off_applied"
   private const val PUSH_METHOD = "push.method"
   private const val MOLLYSOCKET_URL = "push.mollysocket_url"
 
@@ -47,10 +50,22 @@ object KidsSettings {
     get() = prefs?.getBoolean(BLOCK_VIDEO_CALLS, false) ?: false
     set(value) = requirePrefs().edit { putBoolean(BLOCK_VIDEO_CALLS, value) }
 
-  /** See [KidsContactFilter]. Off by default, like Molly. */
-  var blockUnknownContacts: Boolean
-    get() = prefs?.getBoolean(BLOCK_UNKNOWN_CONTACTS, false) ?: false
-    set(value) = requirePrefs().edit { putBoolean(BLOCK_UNKNOWN_CONTACTS, value) }
+  /** See [KidsApprovedContacts]. Off until the parent has added people and turns it on. */
+  var approvedContactsOnly: Boolean
+    get() = prefs?.getBoolean(APPROVED_CONTACTS_ONLY, false) ?: false
+    set(value) = requirePrefs().edit { putBoolean(APPROVED_CONTACTS_ONLY, value) }
+
+  /** Stored as "recipientId|number or username". */
+  var approvedContacts: List<ApprovedContact>
+    get() = prefs?.getStringSet(APPROVED_CONTACTS, emptySet()).orEmpty()
+      .map { ApprovedContact(RecipientId.from(it.substringBefore('|')), it.substringAfter('|')) }
+      .sortedBy { it.label.lowercase() }
+    set(value) = requirePrefs().edit { putStringSet(APPROVED_CONTACTS, value.map { "${it.id.serialize()}|${it.label}" }.toSet()) }
+
+  /** See [KidsDefaults]. */
+  var storiesDefaultApplied: Boolean
+    get() = prefs?.getBoolean(STORIES_DEFAULT_APPLIED, false) ?: false
+    set(value) = requirePrefs().edit { putBoolean(STORIES_DEFAULT_APPLIED, value) }
 
   /** How new messages arrive; null until chosen (see [KidsPush]). */
   var pushMethod: KidsPush.Method?

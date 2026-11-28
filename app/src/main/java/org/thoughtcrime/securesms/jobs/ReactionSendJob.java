@@ -167,6 +167,8 @@ public class ReactionSendJob extends BaseJob {
       throw new AssertionError("We have a message, but couldn't find the thread!");
     }
 
+    if (org.kidsmdm.im.KidsApprovedContacts.isBlocked(conversationRecipientId)) return; // KIDS MDM: approved contacts
+
     RecipientRecord conversationRecipient = SignalDatabase.recipients().getRecord(conversationRecipientId);
 
     if (conversationRecipient.getGroupId() != null && (conversationRecipient.getGroupId().isV1() || conversationRecipient.getGroupId().isMms())) {

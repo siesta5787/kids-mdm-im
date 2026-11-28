@@ -34,6 +34,7 @@ public class VoiceCallShare extends Activity {
 
           SimpleTask.run(() -> Recipient.external(destination), recipient -> {
             if (recipient != null && !TextUtils.isEmpty(destination)) {
+              if (org.kidsmdm.im.KidsCallBlocking.blockOutgoingCall(this, recipient, VIDEO_CALL_MIME_TYPE.equals(getIntent().getType()))) return; // KIDS MDM: call blocking
               if (VIDEO_CALL_MIME_TYPE.equals(getIntent().getType())) {
                 AppDependencies.getSignalCallManager().startOutgoingVideoCall(recipient);
               } else {
