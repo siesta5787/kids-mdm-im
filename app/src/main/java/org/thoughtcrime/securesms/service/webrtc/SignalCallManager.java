@@ -266,10 +266,12 @@ public final class SignalCallManager implements CallManager.Observer, GroupCall.
   }
 
   public void setEnableVideo(boolean enabled) {
+    if (enabled && org.kidsmdm.im.KidsCallBlocking.blockOutgoingVideo(context)) return; // KIDS MDM: call blocking
     process((s, p) -> p.handleSetEnableVideo(s, enabled));
   }
 
   public void startScreenShare(@NonNull android.content.Intent mediaProjectionData) {
+    if (org.kidsmdm.im.KidsCallBlocking.blockOutgoingVideo(context)) return; // KIDS MDM: call blocking
     process((s, p) -> p.handleSetLocalScreenShare(s, true, mediaProjectionData));
   }
 
@@ -290,7 +292,7 @@ public final class SignalCallManager implements CallManager.Observer, GroupCall.
   }
 
   public void acceptCall(boolean answerWithVideo) {
-    process((s, p) -> p.handleAcceptCall(s, answerWithVideo));
+    process((s, p) -> p.handleAcceptCall(s, answerWithVideo && org.kidsmdm.im.KidsCallBlocking.isVideoAllowed())); // KIDS MDM: call blocking
   }
 
   public void denyCall() {

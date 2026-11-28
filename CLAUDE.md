@@ -49,6 +49,7 @@ touched Signal files short: `git diff --stat signal-stable main -- . ':!**/kids*
 | `util/CommunicationActions.java` | one line: block outgoing calls (`KidsCallBlocking`) |
 | `service/webrtc/WebRtcActionProcessor.java` | three lines: hang up blocked incoming calls |
 | `service/webrtc/IdleActionProcessor.java` | one line: don't ring for a blocked incoming group call (follows the video switch) |
+| `service/webrtc/SignalCallManager.java` | three lines (two added, one changed): with video blocked, no camera or screen share during a call, and no answering with video |
 | `conversation/AttachmentKeyboardButtonAdapter.java` | one line: hide the Location and Payment buttons (`KidsPolicy`) |
 | `feature/app-settings/.../home/AppSettingsScreen.kt` (again) | the Donate and Invite rows each wrapped in `if (KidsHooks.showAppSettingsRow(...))` |
 | `megaphone/Megaphones.java` | one line: no megaphones at all (`KidsPolicy.MEGAPHONES_ENABLED`) |
@@ -220,5 +221,5 @@ mollyim fork network (too big for GitHub's "Leave fork network" button). Consequ
       - Phones: replacing a Molly-based install means uninstalling and reinstalling, because Molly's
         on-device data isn't readable. Re-register the account, then pick the delivery method.
       - Branches now: `main` and `signal-stable` (the sync's mirror of Signal's stable release).
-- Known limit: with video calls blocked, an allowed 1:1 voice call can still turn the camera on
-  (blocking only checks how a call starts or rings).
+- Known limit: with video calls blocked, the other person in a voice call can still turn their own
+  camera on, and it shows on this phone (only outgoing video is blocked).

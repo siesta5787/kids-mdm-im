@@ -2,6 +2,7 @@
 <!-- Kids MDM IM strings. English only for now. -->
 <resources>
     <string name="kidsmdm_call_blocked">This type of call is blocked</string>
+    <string name="kidsmdm_video_blocked">Video is turned off</string>
     <string name="kidsmdm_invites_off">Invites are turned off</string>
 
     <string name="kidsmdm_settings__row">Parental controls</string>

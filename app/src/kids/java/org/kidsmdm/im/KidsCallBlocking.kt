@@ -30,6 +30,21 @@ object KidsCallBlocking {
     return true
   }
 
+  /** Hook: SignalCallManager.acceptCall, so a call can't be answered with the camera on. */
+  @JvmStatic
+  fun isVideoAllowed(): Boolean = !isBlocked(isVideo = true)
+
+  /**
+   * Hooks: SignalCallManager.setEnableVideo and startScreenShare, the ways to start sending video
+   * during a call that was allowed (a voice call). Returns true (and explains) if video must stay off.
+   */
+  @JvmStatic
+  fun blockOutgoingVideo(context: Context): Boolean {
+    if (isVideoAllowed()) return false
+    Toast.makeText(context, R.string.kidsmdm_video_blocked, Toast.LENGTH_LONG).show()
+    return true
+  }
+
   /**
    * Hook: WebRtcActionProcessor.handleReceivedOffer. Returns true if the incoming call must be
    * hung up. The call is journaled as MISSED_CALL_BLOCKING and doesn't appear in the kid's call log.
