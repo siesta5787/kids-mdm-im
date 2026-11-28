@@ -26,7 +26,9 @@ same key can read the journal.
 
 - Block unknown contacts: only people in the phone's contacts, people already chatted with and
   members of joined groups get through. Blocked messages and calls are still recorded.
-- Block voice calls and video calls separately. (Incoming *group* call rings aren't blocked yet.)
+- Block voice calls and video calls separately. Group calls count as video calls. With video calls
+  blocked there's no video either way: during a voice call, the camera and screen sharing stay off,
+  and the other person's video and shared screen aren't shown.
 - Choose how new messages arrive.
 - The PIN also locks Signal's settings and other settings screens.
 
@@ -57,9 +59,9 @@ Changes to Signal's own files are kept to a few single lines, so Signal's update
 Everything else lives in `app/src/kids/`, `kidsmdm/` and one build plugin. Build instructions and
 the full list of changes are in [CLAUDE.md](../CLAUDE.md).
 
-Up to v0.06 this project was based on [Molly](https://github.com/mollyim/mollyim-android). That code
-is kept on the `legacy-molly` branch. The UnifiedPush and "block unknown contacts" features are
-adapted from Molly.
+The UnifiedPush and "block unknown contacts" features are adapted from
+[Molly](https://github.com/mollyim/mollyim-android), which earlier versions of this app were based
+on.
 
 ## Legal
 

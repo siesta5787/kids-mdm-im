@@ -120,6 +120,8 @@ public class IdleActionProcessor extends WebRtcActionProcessor {
       return currentState;
     }
 
+    if (org.kidsmdm.im.KidsCallBlocking.blockIncomingGroupRing(webRtcInteractor.getCallManager(), remotePeerGroup.getId(), groupId.getDecodedId(), ringId)) return currentState; // KIDS MDM: call blocking
+
     NotificationProfile activeProfile = NotificationProfiles.getActiveProfile(SignalDatabase.notificationProfiles().getProfiles());
     if (activeProfile != null && !(activeProfile.isRecipientAllowed(remotePeerGroup.getId()) || activeProfile.getAllowAllCalls())) {
       try {
