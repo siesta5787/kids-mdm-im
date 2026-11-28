@@ -213,6 +213,8 @@ public final class PushGroupSendJob extends PushSendJob {
       return;
     }
 
+    if (org.kidsmdm.im.KidsApprovedContacts.refuseSend(messageId)) return; // KIDS MDM: approved contacts
+
     Recipient groupRecipient = message.getThreadRecipient().resolve();
 
     if (!groupRecipient.isPushGroup()) {

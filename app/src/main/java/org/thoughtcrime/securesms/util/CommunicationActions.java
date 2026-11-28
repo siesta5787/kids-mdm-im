@@ -439,7 +439,7 @@ public class CommunicationActions {
   }
 
   private static void startCallInternal(@NonNull CallContext callContext, @NonNull Recipient recipient, boolean isVideo, boolean fromCallLink) {
-    if (org.kidsmdm.im.KidsCallBlocking.blockOutgoingCall(callContext.getContext(), isVideo)) return; // KIDS MDM: call blocking
+    if (org.kidsmdm.im.KidsCallBlocking.blockOutgoingCall(callContext.getContext(), recipient, isVideo)) return; // KIDS MDM: call blocking
     if (isVideo) startVideoCallInternal(callContext, recipient, fromCallLink);
     else         startAudioCallInternal(callContext, recipient);
   }

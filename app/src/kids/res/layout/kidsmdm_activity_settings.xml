@@ -38,18 +38,25 @@
             android:text="@string/kidsmdm_settings__contacts" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/kidsmdm_block_unknown_contacts"
+            android:id="@+id/kidsmdm_approved_only"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:minHeight="56dp"
-            android:text="@string/kidsmdm_settings__block_unknown_contacts" />
+            android:text="@string/kidsmdm_settings__approved_only" />
 
         <TextView
             style="@style/Signal.Text.BodyMedium"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
             android:textColor="?android:attr/textColorSecondary"
-            android:text="@string/kidsmdm_settings__block_unknown_contacts_summary" />
+            android:text="@string/kidsmdm_settings__approved_only_summary" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/kidsmdm_approved_contacts"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
 
         <TextView
             style="@style/Signal.Text.TitleSmall"

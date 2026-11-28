@@ -176,6 +176,8 @@ class IndividualSendJobV2 private constructor(parameters: Parameters, private va
       return Result.success()
     }
 
+    if (org.kidsmdm.im.KidsApprovedContacts.refuseSend(messageId)) return Result.success() // KIDS MDM: approved contacts
+
     val threadId = messageRecord.threadId
     val originalEditedMessage = if (message.messageToEdit > 0) {
       SignalDatabase.messages.getMessageRecordOrNull(message.messageToEdit)

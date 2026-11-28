@@ -140,6 +140,8 @@ class SendReadReceiptJob private constructor(
       return Result.success()
     }
 
+    if (org.kidsmdm.im.KidsApprovedContacts.isBlocked(recipient.id)) return Result.success() // KIDS MDM: approved contacts
+
     if (recipient.groupId != null) {
       Log.w(TAG, "Refusing to send receipts to group")
       return Result.success()

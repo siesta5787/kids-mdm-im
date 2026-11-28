@@ -8,8 +8,25 @@
     <string name="kidsmdm_settings__row">Parental controls</string>
     <string name="kidsmdm_settings__title">Parental controls</string>
     <string name="kidsmdm_settings__contacts">Contacts</string>
-    <string name="kidsmdm_settings__block_unknown_contacts">Block unknown contacts</string>
-    <string name="kidsmdm_settings__block_unknown_contacts_summary">Messages and calls only come through from people in the phone\'s contacts, people your kid has already chatted with, and members of groups your kid has joined.</string>
+    <string name="kidsmdm_settings__approved_only">Only approved contacts</string>
+    <string name="kidsmdm_settings__approved_only_summary">Messages and calls only go to, and come from, people on your list. A group works only if everyone in it is on the list.</string>
+    <string name="kidsmdm_settings__approved_contacts">Approved contacts (%1$d)</string>
+
+    <string name="kidsmdm_approved__title">Approved contacts</string>
+    <string name="kidsmdm_approved__intro">Add people by phone number (with country code, like +1 555 123 4567) or Signal username. Include everyone in any group your kid should use.</string>
+    <string name="kidsmdm_approved__hint">Phone number or username</string>
+    <string name="kidsmdm_approved__add">Add</string>
+    <string name="kidsmdm_approved__remove">Remove</string>
+    <string name="kidsmdm_approved__empty">Nobody added yet. With \"Only approved contacts\" on, nothing gets through.</string>
+    <string name="kidsmdm_approved__looking">Looking up…</string>
+    <string name="kidsmdm_approved__added">Added %1$s</string>
+    <string name="kidsmdm_approved__not_found">No Signal account found. If they use Signal, they may not allow being found by number: add their username instead.</string>
+    <string name="kidsmdm_approved__invalid_number">That doesn\'t look like a full phone number. Include the country code.</string>
+    <string name="kidsmdm_approved__network_error">Couldn\'t reach Signal. Check the connection and try again.</string>
+
+    <string name="kidsmdm_not_approved">Ask a parent to approve this contact</string>
+    <string name="kidsmdm_group_not_approved">Not everyone in this group is approved</string>
+
     <string name="kidsmdm_settings__calls">Calls</string>
     <string name="kidsmdm_settings__block_voice_calls">Block voice calls</string>
     <string name="kidsmdm_settings__block_video_calls">Block video calls</string>

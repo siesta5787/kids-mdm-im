@@ -125,6 +125,7 @@ public class RecipientUtil {
   public static List<Recipient> getEligibleForSending(@NonNull List<Recipient> recipients) {
     return recipients.stream()
                      .filter(r -> r.getRegistered() != RegisteredState.NOT_REGISTERED)
+                     .filter(org.kidsmdm.im.KidsApprovedContacts::isEligibleRecipient) // KIDS MDM: approved contacts
                      .filter(r -> !r.isBlocked()).collect(Collectors.toList());
   }
 

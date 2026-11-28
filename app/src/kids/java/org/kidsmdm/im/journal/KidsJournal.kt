@@ -6,9 +6,12 @@
 
 package org.kidsmdm.im.journal
 
+import org.kidsmdm.im.KidsApprovedContacts
 import org.signal.core.models.database.AttachmentId
 import org.signal.core.models.recipients.RecipientId
 import org.thoughtcrime.securesms.attachments.Attachment
+import org.thoughtcrime.securesms.dependencies.AppDependencies
+import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.util.MediaUtil
 
 object KidsJournal {
@@ -34,7 +37,9 @@ object KidsJournal {
     insertedAttachments: Map<Attachment, AttachmentId>?
   ) {
     if (isStoryOrEdit) return
-    JournalWriteJob.enqueueMessage(threadId, threadRecipient, JournalDatabase.Direction.OUTGOING, sentTimestamp, body)
+    // The send job refuses it (KidsApprovedContacts.refuseSend); record the attempt as such.
+    val journalBody = if (KidsApprovedContacts.isBlocked(threadRecipient)) NOT_SENT_PREFIX + body.orEmpty() else body
+    JournalWriteJob.enqueueMessage(threadId, threadRecipient, JournalDatabase.Direction.OUTGOING, sentTimestamp, journalBody)
 
     insertedAttachments.orEmpty()
       .filter { (attachment, _) -> attachment.uri != null && isJournaledMedia(attachment.contentType) }
@@ -73,14 +78,19 @@ object KidsJournal {
   }
 
   /**
-   * A message dropped by "Block unknown contacts" (KidsContactFilter). Stored as a MESSAGE entry so
-   * kid-phone-server shows it as is, with a prefix saying it was blocked. Attachments are never
-   * downloaded from unknown senders, so only their count is noted.
+   * A message dropped because it isn't from approved people (KidsContactFilter). Stored as a MESSAGE
+   * entry so kid-phone-server shows it as is, with a prefix saying why. [closedGroup] is the group it
+   * was sent to, if that group isn't allowed. Blocked attachments are never downloaded, so only
+   * their count is noted.
    */
   @JvmStatic
-  fun onUnknownContactMessageBlocked(sender: RecipientId, timestamp: Long, body: String?, attachmentCount: Int) {
+  fun onBlockedContactMessage(sender: RecipientId, closedGroup: RecipientId?, timestamp: Long, body: String?, attachmentCount: Int) {
     val text = buildString {
-      append(BLOCKED_PREFIX)
+      if (closedGroup == null) {
+        append(BLOCKED_PREFIX)
+      } else {
+        append("\uD83D\uDEAB Blocked in group \"${Recipient.resolved(closedGroup).getDisplayName(AppDependencies.application)}\" (not everyone is approved): ")
+      }
       if (!body.isNullOrEmpty()) append(body)
       if (attachmentCount > 0) {
         if (!body.isNullOrEmpty()) append(' ')
@@ -90,13 +100,14 @@ object KidsJournal {
     JournalWriteJob.enqueueBlocked(sender, JournalDatabase.EntryType.MESSAGE, timestamp, text, null, null)
   }
 
-  /** A call dropped by "Block unknown contacts"; shown like other blocked calls. */
+  /** A call from someone who isn't approved; shown like other blocked calls. */
   @JvmStatic
-  fun onUnknownContactCallBlocked(sender: RecipientId, timestamp: Long, isVideo: Boolean) {
+  fun onBlockedContactCall(sender: RecipientId, timestamp: Long, isVideo: Boolean) {
     JournalWriteJob.enqueueBlocked(sender, JournalDatabase.EntryType.CALL, timestamp, null, if (isVideo) "VIDEO_CALL" else "AUDIO_CALL", CALL_EVENT_BLOCKED)
   }
 
-  private const val BLOCKED_PREFIX = "\uD83D\uDEAB Blocked (unknown contact): "
+  private const val BLOCKED_PREFIX = "\uD83D\uDEAB Blocked (not approved): "
+  private const val NOT_SENT_PREFIX = "\uD83D\uDEAB Not sent (not approved): "
 
   /** Same event name the Molly-based builds used, so kid-phone-server shows it the same way. */
   const val CALL_EVENT_BLOCKED = "MISSED_CALL_BLOCKING"

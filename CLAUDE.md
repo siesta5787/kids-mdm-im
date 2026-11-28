@@ -6,7 +6,7 @@ monitored messenger for a child's phone. **It's no longer a Molly fork.**
 - It was rebased directly onto Signal on 2026-11-20, because Molly had stalled at Signal 8.19.2.
 - At cutover on 2026-11-22, `next` became `main`. When the repo was recreated on 2026-11-27, the
   Molly-era branches and releases up to v0.10 were left behind (no `legacy-molly` branch any more).
-- A few features are ported from Molly (UnifiedPush/MollySocket, "block unknown contacts"); see below.
+- UnifiedPush/MollySocket is ported from Molly; see below.
 
 The public-facing description is **`.github/README.md`**, which GitHub shows instead of Signal's
 root `README.md` (left untouched, so it never conflicts). Keep it true when behaviour changes.
@@ -46,7 +46,7 @@ touched Signal files short: `git diff --stat signal-stable main -- . ':!**/kids*
 | `database/AttachmentTable.kt` | one line: journal downloaded incoming media |
 | `database/CallTable.kt` | two lines: journal 1:1 and joined/rung group calls |
 | `jobs/JobManagerFactories.java` | one line: register `JournalWriteJob` |
-| `util/CommunicationActions.java` | one line: block outgoing calls (`KidsCallBlocking`) |
+| `util/CommunicationActions.java` | one line: block outgoing calls, by type and approved contacts (`KidsCallBlocking`) |
 | `service/webrtc/WebRtcActionProcessor.java` | three lines: hang up blocked incoming calls |
 | `service/webrtc/IdleActionProcessor.java` | one line: don't ring for a blocked incoming group call (follows the video switch) |
 | `service/webrtc/SignalCallManager.java` | five lines (two added, three changed): with video blocked, no camera or screen share during a call, no answering with video, and the other side's video / screen share stays "off" |
@@ -61,7 +61,11 @@ touched Signal files short: `git diff --stat signal-stable main -- . ':!**/kids*
 | `conversation/NewConversationActivity.kt`, `calls/new/NewCallActivity.kt` | one line each: no "Invite friends" menu item |
 | `conversation/v2/DisabledInputView.kt` | one line: no invite button on non-Signal contacts |
 | `main/MainToolbar.kt` | one line: no Donate item in the chats/calls/stories menu (`KidsPolicy.DONATIONS_ENABLED`) |
-| `messages/MessageContentProcessor.kt` | one line at the top of `shouldIgnore`: drop content from unknown senders (`KidsContactFilter`) |
+| `messages/MessageContentProcessor.kt` | one line at the top of `shouldIgnore`: drop content that isn't from approved people (`KidsContactFilter`) |
+| `recipients/RecipientUtil.java` | one line in `getEligibleForSending`: unapproved people are left out of every send to a member list |
+| `jobs/IndividualSendJobV2.kt`, `jobs/PushGroupSendJob.java` | one line each: refuse (mark failed) a message to a conversation that isn't approved. The legacy `IndividualSendJob` is no longer created. |
+| `jobs/ReactionSendJob.java`, `jobs/TypingSendJob.kt`, `jobs/SendReadReceiptJob.kt` | one line each: send nothing to a conversation that isn't approved |
+| `webrtc/VoiceCallShare.java` | one line: calls started from the phone's Contacts app are checked too |
 | `keyvalue/SettingsValues.kt` | one line in `shouldStayConnectedInBackground`: a working UnifiedPush counts as push, like FCM (`KidsPush.isPushActive`) |
 | `jobs/JobManagerFactories.java` (again) | one line: register `KidsPushRefreshJob` |
 | `.github/workflows/*` (Signal's) | deleted: they'd retarget our PRs to release branches, run a stale bot, etc. The sync job auto-resolves Signal edits to them by keeping the deletion. |
@@ -88,10 +92,16 @@ touched Signal files short: `git diff --stat signal-stable main -- . ':!**/kids*
     ones on the server, which groups conversations by `thread_id`.
   - `KidsCallBlocking`, `KidsPolicy` (feature switches: location, invites, megaphones, prompts,
     hidden settings rows, attachment buttons), `KidsForcedConfig` (forced remote config: GIF search,
-    payments kill switch, call-quality survey, backup megaphones), `KidsContactFilter` (block
-    unknown contacts; dropped messages/calls are journaled in a per-sender thread `base - recipientId`,
-    messages as MESSAGE entries prefixed "🚫 Blocked (unknown contact): ", calls as
-    `MISSED_CALL_BLOCKING`, so kid-phone-server shows them without changes).
+    payments kill switch, call-quality survey, backup megaphones), `KidsDefaults` (one-time defaults:
+    Stories off, since they aren't journaled).
+  - **Approved contacts** (`KidsApprovedContacts`, replaced Molly's "block unknown contacts" on
+    2026-11-28): the parent adds numbers/usernames, resolved to Signal accounts. A group is allowed
+    only if **every** member is approved. Incoming is dropped by `KidsContactFilter` (group updates
+    still apply, so membership stays current); outgoing is refused by the hooks above. Dropped
+    messages/calls are journaled in a per-sender thread `base - recipientId`, messages as MESSAGE
+    entries prefixed "🚫 Blocked (...): " (refused outgoing ones "🚫 Not sent (not approved): "),
+    calls as `MISSED_CALL_BLOCKING`, so kid-phone-server shows them without changes. Call links are
+    never approved. Signal updates that add a new kind of send must be checked against this.
   - `push/`: message delivery, see "Push" below.
   - `res/values/kidsmdm_signal_overrides.xml`: Signal strings reworded by name (the battery
     banner said "This device does not support Play Services").
@@ -213,6 +223,7 @@ mollyim fork network (too big for GitHub's "Leave fork network" button). Consequ
       `InviteActions` hook; Signal's invite screen is PIN-gated.
 - [x] Phase 5: block unknown contacts (Molly's rule: system contact, profile shared, or shared
       accepted group), toggle in Parental controls, off by default
+- [x] Approved contacts replaced "block unknown contacts" (2026-11-28); Stories off by default
 - [x] Phase 6: UnifiedPush (launcher distributor + MollySocket) with a first-run choice between
       Always connected and UnifiedPush, no Google Play wording; journal messages/calls blocked by
       "Block unknown contacts"

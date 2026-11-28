@@ -13,8 +13,12 @@ import org.signal.core.util.logging.Log
 import org.signal.ringrtc.CallException
 import org.signal.ringrtc.CallManager
 import org.thoughtcrime.securesms.R
+import org.thoughtcrime.securesms.recipients.Recipient
 
-/** Independent voice and video call blocking, both directions. Set in [settings.KidsSettingsActivity]. */
+/**
+ * Independent voice and video call blocking, both directions, plus the approved-contacts check for
+ * calls ([KidsApprovedContacts]). Set in [settings.KidsSettingsActivity].
+ */
 object KidsCallBlocking {
   private val TAG = Log.tag(KidsCallBlocking::class.java)
 
@@ -22,9 +26,13 @@ object KidsCallBlocking {
     return if (isVideo) KidsSettings.blockVideoCalls else KidsSettings.blockVoiceCalls
   }
 
-  /** Hook: CommunicationActions.startCallInternal. Returns true (and explains) if the call must not start. */
+  /** Hooks: CommunicationActions.startCallInternal and VoiceCallShare (calls started from the Contacts app). Returns true (and explains) if the call must not start. */
   @JvmStatic
-  fun blockOutgoingCall(context: Context, isVideo: Boolean): Boolean {
+  fun blockOutgoingCall(context: Context, recipient: Recipient, isVideo: Boolean): Boolean {
+    if (KidsApprovedContacts.enabled && !KidsApprovedContacts.isConversationAllowed(recipient)) {
+      KidsApprovedContacts.showNotApproved(recipient)
+      return true
+    }
     if (!isBlocked(isVideo)) return false
     Toast.makeText(context, R.string.kidsmdm_call_blocked, Toast.LENGTH_LONG).show()
     return true
@@ -67,11 +75,12 @@ object KidsCallBlocking {
   /**
    * Hook: IdleActionProcessor.handleGroupCallRingUpdate, for a new ring. Signal's group calls are
    * video calls (starting one goes through [blockOutgoingCall] as video), so the video switch
-   * applies. Returns true if the phone must not ring: the ring is declined and journaled.
+   * applies, as does the approved-contacts check. Returns true if the phone must not ring: the ring
+   * is declined and journaled.
    */
   @JvmStatic
   fun blockIncomingGroupRing(callManager: CallManager, group: RecipientId, groupId: ByteArray, ringId: Long): Boolean {
-    if (!isBlocked(isVideo = true)) return false
+    if (!isBlocked(isVideo = true) && !KidsApprovedContacts.isBlocked(group)) return false
     Log.w(TAG, "Incoming group call ring blocked by parental settings.")
     try {
       callManager.cancelGroupRing(groupId, ringId, CallManager.RingCancelReason.DeclinedByUser)

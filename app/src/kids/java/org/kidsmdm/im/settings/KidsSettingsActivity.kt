@@ -10,6 +10,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.format.DateUtils
 import android.view.View
+import android.widget.Button
 import android.widget.TextView
 import com.google.android.material.materialswitch.MaterialSwitch
 import org.kidsmdm.im.KidsSettings
@@ -33,9 +34,13 @@ class KidsSettingsActivity : BaseActivity() {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.kidsmdm_activity_settings)
 
-    findViewById<MaterialSwitch>(R.id.kidsmdm_block_unknown_contacts).apply {
-      isChecked = KidsSettings.blockUnknownContacts
-      setOnCheckedChangeListener { _, checked -> KidsSettings.blockUnknownContacts = checked }
+    findViewById<MaterialSwitch>(R.id.kidsmdm_approved_only).apply {
+      isChecked = KidsSettings.approvedContactsOnly
+      setOnCheckedChangeListener { _, checked -> KidsSettings.approvedContactsOnly = checked }
+    }
+
+    findViewById<View>(R.id.kidsmdm_approved_contacts).setOnClickListener {
+      startActivity(ApprovedContactsActivity.intent(this))
     }
 
     findViewById<MaterialSwitch>(R.id.kidsmdm_block_voice_calls).apply {
@@ -61,6 +66,7 @@ class KidsSettingsActivity : BaseActivity() {
 
   override fun onResume() {
     super.onResume()
+    findViewById<Button>(R.id.kidsmdm_approved_contacts).text = getString(R.string.kidsmdm_settings__approved_contacts, KidsSettings.approvedContacts.size)
     findViewById<TextView>(R.id.kidsmdm_push_status).text = pushStatusText()
   }
 
