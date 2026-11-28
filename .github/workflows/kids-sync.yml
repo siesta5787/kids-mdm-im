@@ -85,6 +85,10 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # This repo isn't a GitHub fork, so it needs its own copy of Signal's Git LFS files
+          # (screenshot-test images): GitHub rejects pushes that reference ones it doesn't have.
+          git lfs fetch --all signal "refs/signal-tags/$tag"
+          git lfs push origin "refs/signal-tags/$tag"
           # Mirror the release so it's easy to diff against.
           git push -f origin "refs/signal-tags/$tag^{commit}:refs/heads/signal-stable"
 
@@ -99,12 +103,13 @@ jobs:
           git switch -c "$branch"
 
           if ! git merge --no-ff --no-edit -m "Merge Signal $tag" "refs/signal-tags/$tag"; then
-            # Keep our deletion of Signal's workflow files; anything else needs a human.
-            # Ours are all named kids-*; any other conflicted workflow file is one of Signal's.
+            # Keep our deletion of Signal's workflow and community files; anything else needs a
+            # human. Our workflows are all named kids-*; any other conflicted one is Signal's.
             git diff --name-only --diff-filter=U | while read -r path; do
               case "$path" in
                 .github/workflows/kids-*) ;;
-                .github/workflows/*) git rm -q -- "$path" ;;
+                .github/workflows/*|.github/FUNDING.yml|.github/ISSUE_TEMPLATE/*|.github/PULL_REQUEST_TEMPLATE.md)
+                  git rm -q -- "$path" ;;
               esac
             done
             remaining=$(git diff --name-only --diff-filter=U)

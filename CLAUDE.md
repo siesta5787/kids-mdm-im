@@ -7,6 +7,9 @@ monitored messenger for a child's phone. **It's no longer a Molly fork.**
 - At cutover on 2026-11-22, `next` became `main`, and the Molly-era code is archived on `legacy-molly`.
 - A few features are ported from Molly (UnifiedPush/MollySocket, "block unknown contacts"); see below.
 
+The public-facing description is **`.github/README.md`**, which GitHub shows instead of Signal's
+root `README.md` (left untouched, so it never conflicts). Keep it true when behaviour changes.
+
 Pairs with [kid-phone-server](https://github.com/siesta5787/kid-phone-server) and
 [kids-launcher-mdm](https://github.com/siesta5787/kids-launcher-mdm).
 
@@ -58,6 +61,7 @@ touched Signal files short: `git diff --stat signal-stable main -- . ':!**/kids*
 | `keyvalue/SettingsValues.kt` | one line in `shouldStayConnectedInBackground`: a working UnifiedPush counts as push, like FCM (`KidsPush.isPushActive`) |
 | `jobs/JobManagerFactories.java` (again) | one line: register `KidsPushRefreshJob` |
 | `.github/workflows/*` (Signal's) | deleted: they'd retarget our PRs to release branches, run a stale bot, etc. The sync job auto-resolves Signal edits to them by keeping the deletion. |
+| `.github/FUNDING.yml`, `ISSUE_TEMPLATE/`, `PULL_REQUEST_TEMPLATE.md` (Signal's) | deleted: they sent people to Signal's donation page, forums and CLA. Auto-resolved like the workflows. |
 
 ## Where our code lives
 
@@ -164,13 +168,13 @@ for review if its package, signing key or permissions change, or its versionCode
 
 | Workflow | What |
 |---|---|
-| `kids-test.yml` | PRs + pushes to `main` (and a `next` staging branch, if one is ever used again): `kidsmdm/scripts/check-no-google.sh` (fails if any Google artifact would ship) + `assembleKidsProdDebug` + `testKidsProdDebugUnitTest` + `processKidsProdReleaseResources` (checks the release-only label overlay merges) |
+| `kids-test.yml` | PRs + pushes to `main` (and a `next` staging branch, if one is ever used again): `kidsmdm/scripts/check-no-google.sh` (fails if any Google artifact would ship) + `assembleKidsProdDebug` + `testKidsProdDebugUnitTest` + `processKidsProdReleaseResources` (checks the release-only label overlay merges). Skips the push of a sync merge (already tested by the sync). Caches Robolectric's Android jars, because Maven Central rate-limits the runners |
 | `kids-test-apk.yml` | pushes to a `next` staging branch (none since cutover): signed release APK as a workflow **artifact** (not a release) for side-loading. versionCode 200000. |
 | `kids-build-apk.yml` | reusable: builds one signed `kidsProdRelease` APK |
 | `kids-tagrelease.yml` | `gh workflow run kids-tagrelease.yml -R siesta5787/kids-mdm-im [-f version=X.YY]`: tags `main` (default: next version after the highest `vX.YY`), then calls release |
 | `kids-release.yml` | runs on a pushed `vX.YY` tag (from any branch: `git tag v0.07 <commit> && git push origin v0.07`) or when called; builds the tag, checks its versionCode beats every other release, publishes `KidsMDMIM-vX.YY.apk` as a **beta prerelease** |
 | `kids-promote.yml` | `gh workflow run kids-promote.yml -R siesta5787/kids-mdm-im -f version=X.YY`: beta → stable |
-| `kids-sync.yml` | twice daily: Signal stable (from `updates.signal.org/android/latest.json`) → `sync/signal-vX` → test → fast-forward `main` → automatic beta release; opens an issue on conflict or failure; mirrors the release to `signal-stable` |
+| `kids-sync.yml` | twice daily: Signal stable (from `updates.signal.org/android/latest.json`) → uploads Signal's new LFS files → `sync/signal-vX` → test → fast-forward `main` → automatic beta release; opens an issue on conflict or failure; mirrors the release to `signal-stable` |
 
 `workflow_dispatch` and `schedule` only work for workflows on the default branch, which is `main`
 since cutover. (Before that, betas were cut by pushing a `vX.YY` tag by hand, and v0.09/v0.11 were
@@ -182,10 +186,13 @@ Secrets: `SECRET_KEYSTORE` (base64 PKCS12), `SECRET_KEYSTORE_ALIAS=kidsmdm`,
 `SYNC_PAT`. `SYNC_PAT` is a fine-grained token with Contents + Workflows read/write; GitHub refuses
 `GITHUB_TOKEN` pushes whose commits touch `.github/workflows`, which Signal's history does.
 
-GitHub still lists the repo as a *fork of mollyim/mollyim-android* until the owner detaches it,
-because GitHub has no API for that: use Settings → Danger zone, or ask GitHub Support. Until then,
-always pass `-R siesta5787/kids-mdm-im` to `gh pr create`, or it targets Molly. Signal's screenshot-test PNGs are Git LFS and are never
-fetched (`GIT_LFS_SKIP_SMUDGE=1`); they aren't needed to build.
+**Standalone repository, not a GitHub fork.** It was recreated on 2026-11-27 to leave the
+mollyim fork network (too big for GitHub's "Leave fork network" button). Consequences:
+- Pull request numbers restarted. `(#N)` in commit messages up to that date refers to the old repo.
+- The repo holds its own copy of Signal's Git LFS files (screenshot-test PNGs), which `kids-sync.yml`
+  keeps up to date. A hand-merge of a Signal tag needs the same two steps before pushing:
+  `git lfs fetch --all signal <ref>` and `git lfs push origin <ref>`. Builds and tests don't need
+  the files (`GIT_LFS_SKIP_SMUDGE=1`).
 
 ## Rebase status (see the plan in the Kids MDM memory / chat of 2026-11-20)
 

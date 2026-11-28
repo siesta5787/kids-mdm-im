@@ -26,6 +26,12 @@ concurrency:
 jobs:
   test:
     name: Build and unit test
+    # kids-sync.yml has already built and tested a Signal merge before it fast-forwards main to
+    # it, so the push that follows doesn't need a second hour-long run.
+    if: >-
+      github.event_name != 'push' ||
+      github.event.head_commit.author.name != 'github-actions[bot]' ||
+      !startsWith(github.event.head_commit.message, 'Merge Signal ')
     runs-on: ubuntu-24.04
     timeout-minutes: 180
 
@@ -57,6 +63,15 @@ jobs:
             echo "org.gradle.jvmargs=-Xmx10g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC"
             echo "kotlin.compiler.execution.strategy=in-process"
           } >> "$GRADLE_USER_HOME/gradle.properties"
+
+      # Robolectric downloads an Android jar per SDK level from Maven Central while the tests run.
+      # Central rate-limits GitHub's runners (HTTP 429), which has failed otherwise good runs.
+      - name: Cache Robolectric's Android jars
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/test-libs.versions.toml', 'app/src/test/resources/robolectric.properties') }}
+          restore-keys: robolectric-
 
       - name: Check no Google libraries ship
         run: kidsmdm/scripts/check-no-google.sh
