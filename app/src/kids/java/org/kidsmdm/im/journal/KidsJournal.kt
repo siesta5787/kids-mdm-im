@@ -66,6 +66,12 @@ object KidsJournal {
     JournalWriteJob.enqueueCall(null, peer, JournalDatabase.Direction.INCOMING, timestamp, if (isVideo) "VIDEO_CALL" else "AUDIO_CALL", CALL_EVENT_BLOCKED)
   }
 
+  /** A group call ring refused by parental call blocking, journaled in the group's thread. */
+  @JvmStatic
+  fun onIncomingGroupCallBlocked(group: RecipientId, timestamp: Long) {
+    JournalWriteJob.enqueueCall(null, group, JournalDatabase.Direction.INCOMING, timestamp, "GROUP_CALL", CALL_EVENT_BLOCKED)
+  }
+
   /**
    * A message dropped by "Block unknown contacts" (KidsContactFilter). Stored as a MESSAGE entry so
    * kid-phone-server shows it as is, with a prefix saying it was blocked. Attachments are never

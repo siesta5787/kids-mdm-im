@@ -4,7 +4,8 @@ A downstream fork of [Signal-Android](https://github.com/signalapp/Signal-Androi
 monitored messenger for a child's phone. **It's no longer a Molly fork.**
 - Up to v0.06 it was based on Molly.
 - It was rebased directly onto Signal on 2026-11-20, because Molly had stalled at Signal 8.19.2.
-- At cutover on 2026-11-22, `next` became `main`, and the Molly-era code is archived on `legacy-molly`.
+- At cutover on 2026-11-22, `next` became `main`. When the repo was recreated on 2026-11-27, the
+  Molly-era branches and releases up to v0.10 were left behind (no `legacy-molly` branch any more).
 - A few features are ported from Molly (UnifiedPush/MollySocket, "block unknown contacts"); see below.
 
 The public-facing description is **`.github/README.md`**, which GitHub shows instead of Signal's
@@ -47,6 +48,7 @@ touched Signal files short: `git diff --stat signal-stable main -- . ':!**/kids*
 | `jobs/JobManagerFactories.java` | one line: register `JournalWriteJob` |
 | `util/CommunicationActions.java` | one line: block outgoing calls (`KidsCallBlocking`) |
 | `service/webrtc/WebRtcActionProcessor.java` | three lines: hang up blocked incoming calls |
+| `service/webrtc/IdleActionProcessor.java` | one line: don't ring for a blocked incoming group call (follows the video switch) |
 | `conversation/AttachmentKeyboardButtonAdapter.java` | one line: hide the Location and Payment buttons (`KidsPolicy`) |
 | `feature/app-settings/.../home/AppSettingsScreen.kt` (again) | the Donate and Invite rows each wrapped in `if (KidsHooks.showAppSettingsRow(...))` |
 | `megaphone/Megaphones.java` | one line: no megaphones at all (`KidsPolicy.MEGAPHONES_ENABLED`) |
@@ -213,9 +215,10 @@ mollyim fork network (too big for GitHub's "Leave fork network" button). Consequ
       Always connected and UnifiedPush, no Google Play wording; journal messages/calls blocked by
       "Block unknown contacts"
 - [x] Phase 7: cutover (2026-11-22).
-      - Branches: `main` (Molly) → `legacy-molly`; `next` → `main`, now the default branch.
+      - Branches: the Molly `main` was set aside; `next` → `main`, now the default branch.
       - Releases: v0.11 promoted to stable; the twice-daily Signal sync and the dispatch workflows now run.
       - Phones: replacing a Molly-based install means uninstalling and reinstalling, because Molly's
         on-device data isn't readable. Re-register the account, then pick the delivery method.
-      - Leftover Molly-era branches (`molly-upstream`, `upstream-main`, `signal-8.20.4`,
-        `feature-access`, `fix/socks-proxy-dns-leak`, `flatline-dev-build`) can be deleted at any time.
+      - Branches now: `main` and `signal-stable` (the sync's mirror of Signal's stable release).
+- Known limit: with video calls blocked, an allowed 1:1 voice call can still turn the camera on
+  (blocking only checks how a call starts or rings).

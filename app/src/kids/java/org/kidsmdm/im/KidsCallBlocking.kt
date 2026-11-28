@@ -10,6 +10,8 @@ import android.widget.Toast
 import org.kidsmdm.im.journal.KidsJournal
 import org.signal.core.models.recipients.RecipientId
 import org.signal.core.util.logging.Log
+import org.signal.ringrtc.CallException
+import org.signal.ringrtc.CallManager
 import org.thoughtcrime.securesms.R
 
 /** Independent voice and video call blocking, both directions. Set in [settings.KidsSettingsActivity]. */
@@ -37,6 +39,24 @@ object KidsCallBlocking {
     if (!isBlocked(isVideo)) return false
     Log.w(TAG, "Incoming ${if (isVideo) "video" else "voice"} call blocked by parental settings.")
     KidsJournal.onIncomingCallBlocked(peer, timestamp, isVideo)
+    return true
+  }
+
+  /**
+   * Hook: IdleActionProcessor.handleGroupCallRingUpdate, for a new ring. Signal's group calls are
+   * video calls (starting one goes through [blockOutgoingCall] as video), so the video switch
+   * applies. Returns true if the phone must not ring: the ring is declined and journaled.
+   */
+  @JvmStatic
+  fun blockIncomingGroupRing(callManager: CallManager, group: RecipientId, groupId: ByteArray, ringId: Long): Boolean {
+    if (!isBlocked(isVideo = true)) return false
+    Log.w(TAG, "Incoming group call ring blocked by parental settings.")
+    try {
+      callManager.cancelGroupRing(groupId, ringId, CallManager.RingCancelReason.DeclinedByUser)
+    } catch (e: CallException) {
+      Log.w(TAG, "Couldn't cancel the blocked ring", e)
+    }
+    KidsJournal.onIncomingGroupCallBlocked(group, System.currentTimeMillis())
     return true
   }
 }
