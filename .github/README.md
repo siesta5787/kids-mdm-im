@@ -27,8 +27,8 @@ same key can read the journal.
 - Block unknown contacts: only people in the phone's contacts, people already chatted with and
   members of joined groups get through. Blocked messages and calls are still recorded.
 - Block voice calls and video calls separately. Group calls count as video calls. With video calls
-  blocked, the camera and screen sharing also stay off during voice calls. The other person can
-  still turn their own camera on.
+  blocked there's no video either way: during a voice call, the camera and screen sharing stay off,
+  and the other person's video and shared screen aren't shown.
 - Choose how new messages arrive.
 - The PIN also locks Signal's settings and other settings screens.
 

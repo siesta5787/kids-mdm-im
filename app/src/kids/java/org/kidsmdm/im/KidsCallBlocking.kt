@@ -30,7 +30,14 @@ object KidsCallBlocking {
     return true
   }
 
-  /** Hook: SignalCallManager.acceptCall, so a call can't be answered with the camera on. */
+  /**
+   * Whether any call video may flow. Hooks:
+   *  - SignalCallManager.acceptCall: a call can't be answered with the camera on;
+   *  - SignalCallManager's remote video / screen share events: the other person is shown as
+   *    audio-only;
+   *  - BroadcastVideoSink.onFrame: no call video frame is ever drawn. Runs for every frame, so it
+   *    must stay cheap.
+   */
   @JvmStatic
   fun isVideoAllowed(): Boolean = !isBlocked(isVideo = true)
 

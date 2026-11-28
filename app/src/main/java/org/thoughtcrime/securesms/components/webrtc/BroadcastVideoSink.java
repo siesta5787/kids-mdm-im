@@ -77,6 +77,7 @@ public class BroadcastVideoSink implements VideoSink {
 
   @Override
   public synchronized void onFrame(@NonNull VideoFrame videoFrame) {
+    if (!org.kidsmdm.im.KidsCallBlocking.isVideoAllowed()) return; // KIDS MDM: call blocking, no call video is ever drawn
     boolean isDeviceRotationIgnored = deviceOrientationDegrees == DEVICE_ROTATION_IGNORE;
 
     if (!isDeviceRotationIgnored && forceRotate) {

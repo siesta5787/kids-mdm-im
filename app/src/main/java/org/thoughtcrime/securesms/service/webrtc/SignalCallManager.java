@@ -761,11 +761,11 @@ public final class SignalCallManager implements CallManager.Observer, GroupCall.
         case REMOTE_AUDIO_DISABLE:
           return p.handleRemoteAudioEnable(s, false);
         case REMOTE_VIDEO_ENABLE:
-          return p.handleRemoteVideoEnable(s, true);
+          return p.handleRemoteVideoEnable(s, org.kidsmdm.im.KidsCallBlocking.isVideoAllowed()); // KIDS MDM: call blocking
         case REMOTE_VIDEO_DISABLE:
           return p.handleRemoteVideoEnable(s, false);
         case REMOTE_SHARING_SCREEN_ENABLE:
-          return p.handleScreenSharingEnable(s, true);
+          return p.handleScreenSharingEnable(s, org.kidsmdm.im.KidsCallBlocking.isVideoAllowed()); // KIDS MDM: call blocking
         case REMOTE_SHARING_SCREEN_DISABLE:
           return p.handleScreenSharingEnable(s, false);
         case GLARE_HANDLING_FAILURE:
